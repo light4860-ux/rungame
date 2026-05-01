@@ -65,6 +65,7 @@ class Game {
     this.spawnTimer = 0;
     this.nextSpawnInterval = this.getRandomSpawnInterval();
     this.lastPatternName = "";
+    this.lastTime = 0;
 
     this.bindEvents();
     this.init();
@@ -238,12 +239,8 @@ class Game {
     this.score += this.worldSpeed * GAME_CONFIG.score.distanceScoreRate;
 
     if (this.background) this.background.update(this.worldSpeed);
-    this.player.update(this.input.keys, this.worldSpeed, deltaTime);
-    this.updateObstacles(deltaTime);
-    this.updateItems(deltaTime);
+    this.player.update(this.input, this.worldSpeed, deltaTime);
     this.updateParticles(deltaTime);
-    this.updateScore(deltaTime);
-    this.patternManager.update(this.worldSpeed, deltaTime);
 
     // 패턴 단위 생성 관리
     this.spawnTimer++;
