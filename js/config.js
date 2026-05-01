@@ -210,7 +210,7 @@ const GAME_CONFIG = {
         width: 115,
         height: 190,
         groundOffset: 0, // 이미지 여백에 따라 -5 ~ +8 조정 가능
-        hitBoxPadding: 10,
+        hitBoxPadding: 20,
       },
       slide: {
         width: 230,
