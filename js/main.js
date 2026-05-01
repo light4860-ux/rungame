@@ -471,37 +471,47 @@ class Game {
   drawCharacterCard({ x, y, width, height, index, name, selectable, isSelected }) {
     const ctx = this.ctx;
 
-    // 1. 카드 배경 및 테두리 (Glow 효과 포함)
+    // 1. 카드 배경 색상 정의 (선택 여부와 관계없이 동일하게 유지하여 이미지 오염 방지)
+    const cardFillColor = selectable
+      ? "rgba(70, 42, 86, 0.58)"
+      : "rgba(28, 22, 42, 0.68)";
+
+    // 2. 카드 기본 배경 및 테두리 그리기
     ctx.save();
-
-    ctx.fillStyle = selectable
-      ? "rgba(92, 55, 98, 0.68)"
-      : "rgba(42, 34, 58, 0.72)";
-
-    ctx.strokeStyle = isSelected
-      ? "#ffd600"
-      : selectable
-        ? "rgba(238, 230, 255, 0.55)"
-        : "rgba(160, 145, 180, 0.35)";
-
-    ctx.lineWidth = isSelected ? 5 : 2;
-
-    if (isSelected) {
-      ctx.shadowColor = "rgba(255, 214, 0, 0.9)";
-      ctx.shadowBlur = 18;
-    } else {
-      ctx.shadowBlur = 0;
-    }
-
     ctx.beginPath();
     ctx.roundRect(x, y, width, height, 18);
+    ctx.fillStyle = cardFillColor;
     ctx.fill();
+    ctx.strokeStyle = selectable
+      ? "rgba(238, 230, 255, 0.55)"
+      : "rgba(160, 145, 180, 0.35)";
+    ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.restore();
 
-    ctx.restore(); // Shadow 상태 해제
+    // 3. 선택된 카드 강조 (외곽 Glow 효과만 별도로 추가)
+    if (isSelected) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, 18);
+      ctx.strokeStyle = "#ffd600";
+      ctx.lineWidth = 5;
+      ctx.shadowColor = "rgba(255, 214, 0, 0.85)";
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    // 2. 캐릭터 이미지 (상태 초기화 후 렌더링)
+    // 4. 캐릭터 이미지 및 텍스트 렌더링
     if (index === 0) {
+      // 캐릭터 이미지 뒤에 중립 보라색 preview panel 배치
+      ctx.save();
+      ctx.fillStyle = "rgba(48, 32, 70, 0.55)";
+      ctx.beginPath();
+      ctx.roundRect(x + 34, y + 34, width - 68, 190, 16);
+      ctx.fill();
+      ctx.restore();
+
       const character = this.characters[index];
       const cardImage = character && character.cardAssetKey
         ? this.assets.getImage(character.cardAssetKey)
@@ -510,7 +520,7 @@ class Game {
       if (cardImage && cardImage.complete !== false) {
         ctx.save();
         
-        // 캐릭터 이미지에 영향을 주지 않도록 상태 완전 초기화
+        // 캐릭터 이미지에 영향을 주지 않도록 모든 그래픽 상태 완전 초기화
         ctx.shadowBlur = 0;
         ctx.shadowColor = "transparent";
         ctx.globalAlpha = 1;
@@ -550,12 +560,13 @@ class Game {
         ctx.restore();
       }
 
-      // 3. 카드 텍스트
+      // 5. 카드 텍스트 그리기 (상태 격리)
       ctx.save();
-      ctx.font = "bold 30px Arial";
-      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 0;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      ctx.font = "bold 30px Arial";
+      ctx.fillStyle = "#ffffff";
       ctx.fillText(name, x + width / 2, y + height - 72);
 
       ctx.font = "bold 18px Arial";
