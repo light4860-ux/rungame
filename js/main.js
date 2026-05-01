@@ -38,13 +38,15 @@ class Game {
         id: "jieeng",
         name: "지에엥",
         selectable: true,
-        assetKey: "playerRun"
+        assetKey: "playerRun",
+        cardAssetKey: "characterJieengCard"
       },
       {
         id: "empty",
         name: "Coming Soon",
         selectable: false,
-        assetKey: null
+        assetKey: null,
+        cardAssetKey: null
       }
     ];
 
@@ -498,16 +500,29 @@ class Game {
     ctx.shadowBlur = 0;
 
     if (index === 0) {
-      const playerImage = this.assets.getImage("playerRun");
+      const character = this.characters[index];
+      const cardImage = character && character.cardAssetKey
+        ? this.assets.getImage(character.cardAssetKey)
+        : null;
 
-      if (playerImage) {
-        const previewWidth = 170;
-        const previewHeight = 170;
+      if (cardImage && cardImage.complete !== false) {
+        const maxPreviewWidth = 190;
+        const maxPreviewHeight = 210;
+
+        const imageRatio = cardImage.width / cardImage.height;
+        let previewWidth = maxPreviewWidth;
+        let previewHeight = previewWidth / imageRatio;
+
+        if (previewHeight > maxPreviewHeight) {
+          previewHeight = maxPreviewHeight;
+          previewWidth = previewHeight * imageRatio;
+        }
+
         const previewX = x + width / 2 - previewWidth / 2;
-        const previewY = y + 72;
+        const previewY = y + 52;
 
         ctx.drawImage(
-          playerImage,
+          cardImage,
           previewX,
           previewY,
           previewWidth,

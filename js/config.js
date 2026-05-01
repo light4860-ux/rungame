@@ -266,6 +266,7 @@ const GAME_CONFIG = {
       playerJump: "./assets/images/character_jump.png",
       playerDoubleJump: "./assets/images/character_doublejump.png",
       playerSlide: "./assets/images/character_slide.png",
+      characterJieengCard: "./assets/images/character_jieeng_card.png",
       
       // Stage 1 장애물 에셋
       obstacleNormal: "./assets/images/obstacle_stage1_normal_01.png",
