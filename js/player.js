@@ -127,6 +127,12 @@ class Player {
     this.bounceTimer = 0;
     this.bounceOffset = 0;
 
+    // 거대화 상태 추가
+    this.isGiantMode = false;
+    this.giantModeTimer = 0;
+    this.giantScale = 1.45; // 시각적 배율
+    this.giantHitBoxScale = 1.15; // 히트박스 배율
+
     this.color = GAME_CONFIG.player.color;
 
     const animConfig = GAME_CONFIG.player.animation;
@@ -180,8 +186,11 @@ class Player {
     this.isInvincible = false;
     this.invincibleTimer = 0;
 
-    Object.values(this.animations).forEach((anim) => anim && anim.reset());
     this.currentAnimKey = "run";
+
+    // 거대화 초기화
+    this.isGiantMode = false;
+    this.giantModeTimer = 0;
   }
 
   update(input, worldSpeed, deltaTime) {
@@ -190,6 +199,27 @@ class Player {
     this.updateAnimationState(deltaTime);
     this.updateInvincibility(deltaTime);
     this.updateBounceEffect(deltaTime);
+    this.updateGiantMode(deltaTime);
+  }
+
+  // 거대화 상태 업데이트
+  updateGiantMode(deltaTime) {
+    if (!this.isGiantMode) return;
+
+    this.giantModeTimer -= deltaTime;
+    if (this.giantModeTimer <= 0) {
+      this.isGiantMode = false;
+      this.giantModeTimer = 0;
+    }
+  }
+
+  // 거대화 활성화
+  activateGiantMode(duration) {
+    this.isGiantMode = true;
+    this.giantModeTimer = duration;
+    // 거대화 획득 시 짧은 무적 제공 (선택 사항이나 안정성 위해)
+    this.isInvincible = true;
+    this.invincibleTimer = Math.max(this.invincibleTimer, 1000);
   }
 
   // 달리기 중 상하 바운스 효과 (1~2px 부드러운 움직임)
@@ -332,22 +362,35 @@ class Player {
 
   getHitBox() {
     const config = GAME_CONFIG.player;
+    let baseBox;
 
     if (this.isSliding) {
-      return {
+      baseBox = {
         x: this.x + config.slideHitBoxOffsetX,
         y: this.y + config.slideHitBoxOffsetY,
         width: config.slideHitBoxWidth,
         height: config.slideHitBoxHeight,
       };
+    } else {
+      baseBox = {
+        x: this.x + config.hitBoxOffsetX,
+        y: this.y + config.hitBoxOffsetY,
+        width: config.hitBoxWidth,
+        height: config.hitBoxHeight,
+      };
     }
 
-    return {
-      x: this.x + config.hitBoxOffsetX,
-      y: this.y + config.hitBoxOffsetY,
-      width: config.hitBoxWidth,
-      height: config.hitBoxHeight,
-    };
+    if (this.isGiantMode) {
+      const scale = this.giantHitBoxScale;
+      return {
+        x: baseBox.x - (baseBox.width * (scale - 1)) / 2,
+        y: baseBox.y - (baseBox.height * (scale - 1)), // 바닥 기준이므로 위쪽으로만 확장
+        width: baseBox.width * scale,
+        height: baseBox.height * scale,
+      };
+    }
+
+    return baseBox;
   }
 
   // 현재 모션별 정밀 인셋 값을 가져옵니다.
@@ -378,9 +421,23 @@ class Player {
     ctx.save();
 
     // 무적 상태일 때 깜빡임 효과 적용
-    if (this.isInvincible) {
+    if (this.isInvincible && !this.isGiantMode) {
       const blink = Math.floor(this.invincibleTimer / 100) % 2 === 0;
       ctx.globalAlpha = blink ? 0.45 : 1;
+    }
+
+    // 거대화 아우라 효과
+    if (this.isGiantMode) {
+      ctx.save();
+      const box = this.getHitBox();
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = "rgba(255, 215, 0, 0.6)"; // 황금색 아우라
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.3)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20, 20);
+      ctx.stroke();
+      ctx.restore();
     }
 
     const anim = this.animations[this.currentAnimKey];
@@ -389,15 +446,17 @@ class Player {
     if (anim && anim.image) {
       // 모션별 렌더링 설정 적용
       const renderSetting = this.getCurrentRenderSetting();
-      const dw = renderSetting.displayWidth;
+      // 거대화 스케일 적용
+      const scale = this.isGiantMode ? this.giantScale : 1;
+      const dw = renderSetting.displayWidth * scale;
       
       const sourceInset = this.getCurrentSourceInset();
       const renderH = anim.getRenderHeight(dw, sourceInset);
       
-      const drawX = this.x - (dw - this.width) / 2 + renderSetting.offsetX;
+      const drawX = this.x - (dw - this.width) / 2 + renderSetting.offsetX * scale;
       
-      // y값에 바운스 오프셋 적용
-      const drawY = (this.y + this.height) - renderH + renderSetting.offsetY + this.bounceOffset;
+      // y값에 바운스 오프셋 적용 및 바닥 정렬 유지
+      const drawY = (this.y + this.height) - renderH + (renderSetting.offsetY * scale) + this.bounceOffset;
 
       drawn = anim.draw(ctx, drawX, drawY, dw, sourceInset);
     }

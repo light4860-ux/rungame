@@ -229,6 +229,11 @@ const GAME_CONFIG = {
     score: 100,
     color: "#ffd600",
     collectPadding: 2,
+    giantPotion: {
+      width: 48,
+      height: 56,
+      score: 300,
+    }
   },
 
   // 패턴 생성 시스템 설정
@@ -279,6 +284,7 @@ const GAME_CONFIG = {
       
       bgStage1: "./assets/images/bg_stage1_test.png",
       ground: "./assets/images/ground_stage1_pastel_gothic.png",
+      giantPotion: "./assets/images/item_giant_potion.png",
     },
 
     // 게임 중단을 방지하기 위해 크로마키 기능을 우선 비활성화합니다.

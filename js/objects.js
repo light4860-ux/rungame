@@ -201,3 +201,35 @@ class Item extends GameObject {
     ctx.restore();
   }
 }
+
+class GiantPotion extends GameObject {
+  constructor({ x, y, image }) {
+    const config = GAME_CONFIG.item.giantPotion;
+    super({
+      x,
+      y,
+      width: config.width,
+      height: config.height,
+      image,
+    });
+    this.type = "giant_potion";
+  }
+
+  draw(ctx) {
+    if (!this.image) return;
+    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+    
+    if (GAME_CONFIG.debug.showHitBox) {
+      this.drawHitBox(ctx);
+    }
+  }
+
+  drawHitBox(ctx) {
+    const box = this.getHitBox();
+    ctx.save();
+    ctx.strokeStyle = "gold";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    ctx.restore();
+  }
+}

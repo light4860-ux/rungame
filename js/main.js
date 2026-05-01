@@ -252,10 +252,20 @@ class Game {
     this.obstacles.forEach((obstacle) => {
       obstacle.update(this.worldSpeed);
       if (this.checkCollision(this.player, obstacle)) {
-        // 난이도별 데미지 적용
-        const damaged = this.player.takeDamage(diff.damage);
-        if (damaged && this.player.isDead()) {
-          this.currentScreen = SCREEN.GAME_OVER;
+        if (this.player.isGiantMode) {
+          // 거대화 중 장애물 파괴
+          obstacle.markedForDelete = true;
+          // 보너스 점수
+          let bonus = 50;
+          if (obstacle.type === "double") bonus = 80;
+          if (obstacle.type === "slide") bonus = 60;
+          this.score += bonus;
+        } else {
+          // 난이도별 데미지 적용
+          const damaged = this.player.takeDamage(diff.damage);
+          if (damaged && this.player.isDead()) {
+            this.currentScreen = SCREEN.GAME_OVER;
+          }
         }
       }
     });
@@ -266,7 +276,16 @@ class Game {
       if (!item.collected && this.checkCollision(this.player, item)) {
         item.collected = true;
         item.markedForDelete = true;
-        this.score += GAME_CONFIG.item.score;
+        
+        if (item.type === "giant_potion") {
+          // 거대화 물약 획득
+          const duration = 5000 + Math.random() * 2000; // 5~7초
+          this.player.activateGiantMode(duration);
+          this.score += GAME_CONFIG.item.giantPotion.score;
+        } else {
+          // 일반 코인 획득
+          this.score += GAME_CONFIG.item.score;
+        }
       }
     });
 
@@ -281,6 +300,18 @@ class Game {
     const pattern = this.patternManager.createPattern(patternName, startX);
     if (pattern.obstacles) this.obstacles.push(...pattern.obstacles);
     if (pattern.items) this.items.push(...pattern.items);
+
+    // 거대화 물약 스폰 (낮은 확률)
+    if (Math.random() < 0.15) { // 약 15% 확률로 패턴 생성 시 물약 스폰 시도
+      const potionImage = this.assets.getImage("giantPotion");
+      if (potionImage) {
+        // 장애물과 겹치지 않는 위치 찾기 (패턴 끝 부분에 배치)
+        const potionX = startX + 600 + Math.random() * 400;
+        const potionY = GAME_CONFIG.ground.y - 90;
+        this.items.push(new GiantPotion({ x: potionX, y: potionY, image: potionImage }));
+      }
+    }
+
     this.lastPatternName = patternName;
   }
 
@@ -343,6 +374,15 @@ class Game {
     this.ctx.font = "20px Arial";
     this.ctx.textAlign = "right";
     this.ctx.fillText(`DIFFICULTY: ${difficultyConfig[this.selectedDifficulty].label}`, this.canvas.width - 40, 60);
+
+    // 거대화 남은 시간 표시
+    if (this.player && this.player.isGiantMode) {
+      this.ctx.fillStyle = "#FFD700";
+      this.ctx.font = "bold 24px Arial";
+      this.ctx.textAlign = "right";
+      const remaining = (this.player.giantModeTimer / 1000).toFixed(1);
+      this.ctx.fillText(`GIANT: ${remaining}s`, this.canvas.width - 40, 100);
+    }
   }
 
   drawHpBar() {
