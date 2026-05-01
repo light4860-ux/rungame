@@ -1,0 +1,42 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #1c1f26;
+  font-family: Arial, sans-serif;
+  color: white;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* 게임 전체 영역 */
+#gameWrap {
+  position: relative;
+}
+
+/* Canvas 중앙 정렬 및 테두리 */
+#gameCanvas {
+  display: block;
+  width: 1280px;
+  height: 720px;
+  background: #87ceeb;
+  border: 4px solid #ffffff;
+  border-radius: 12px;
+}
+
+/* 조작법 UI */
+#uiPanel {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: #dddddd;
+}
+
+#uiPanel p {
+  margin: 4px 0;
+}

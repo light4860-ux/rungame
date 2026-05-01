@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML5 Canvas Running Game Prototype</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="gameWrap">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <div id="uiPanel">
+      <p>SPACE : 점프 / 2단 점프</p>
+      <p>↓ : 슬라이딩</p>
+      <p>ENTER : 시작 / 재시작</p>
+    </div>
+  </div>
+
+  <!-- 라이브러리 없이 순수 JS만 사용합니다. -->
+  <script src="./js/config.js"></script>
+  <script src="./js/assetLoader.js"></script>
+  <script src="./js/background.js"></script>
+  <script src="./js/objects.js"></script>
+  <script src="./js/player.js"></script>
+  <script src="./js/patternManager.js"></script>
+  <script src="./js/main.js"></script>
+</body>
+</html>
