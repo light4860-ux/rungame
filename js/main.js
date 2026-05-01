@@ -28,8 +28,25 @@ class Game {
     
     // 선택 값 관리
     this.selectedDifficulty = "normal";
-    this.selectedCharacterIndex = 0; // 현재 확정된 캐릭터 인덱스
-    this.cursorCharacterIndex = 0;   // 캐릭터 선택 화면에서의 커서 위치
+    this.selectedCharacterIndex = 0;
+    this.characterSelectIndex = 0;
+    this.characterSelectMessage = "";
+    this.characterSelectMessageTimer = 0;
+
+    this.characters = [
+      {
+        id: "jieeng",
+        name: "지에엥",
+        selectable: true,
+        assetKey: "playerRun"
+      },
+      {
+        id: "empty",
+        name: "Coming Soon",
+        selectable: false,
+        assetKey: null
+      }
+    ];
 
     this.score = 0;
     this.distance = 0;
@@ -71,6 +88,12 @@ class Game {
 
   bindEvents() {
     window.addEventListener("keydown", (event) => {
+      if (this.state === GAME_STATE.CHARACTER_SELECT) {
+        if (this.handleCharacterSelectKeyDown(event)) {
+          return;
+        }
+      }
+
       // 메뉴 상태에서는 기본 브라우저 동작 방지 (특히 Backspace)
       if (this.currentScreen !== SCREEN.PLAYING) {
         if (["Space", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", "Backspace"].includes(event.code)) {
@@ -86,25 +109,6 @@ class Game {
           this.mainMenuIndex = (this.mainMenuIndex + 1) % this.mainMenuItems.length;
         } else if (event.code === "Enter" || event.code === "Space") {
           this.selectMenu();
-        }
-        return;
-      }
-
-      // 2. 캐릭터 선택 조작
-      if (this.currentScreen === SCREEN.CHARACTER_SELECT) {
-        if (event.code === "ArrowLeft") {
-          this.cursorCharacterIndex = (this.cursorCharacterIndex - 1 + characters.length) % characters.length;
-        } else if (event.code === "ArrowRight") {
-          this.cursorCharacterIndex = (this.cursorCharacterIndex + 1) % characters.length;
-        } else if (event.code === "Enter" || event.code === "Space") {
-          const char = characters[this.cursorCharacterIndex];
-          if (char.selectable) {
-            this.selectedCharacterIndex = this.cursorCharacterIndex;
-            this.currentScreen = SCREEN.MAIN_MENU;
-          }
-          // selectable이 아니면 아무 동작 안 함 (화면에 남음)
-        } else if (event.code === "Escape" || event.code === "Backspace") {
-          this.currentScreen = SCREEN.MAIN_MENU;
         }
         return;
       }
@@ -174,8 +178,10 @@ class Game {
       this.reset();
       this.currentScreen = SCREEN.PLAYING;
     } else if (this.mainMenuIndex === 1) {
-      this.cursorCharacterIndex = this.selectedCharacterIndex; // 현재 선택된 캐릭터로 커서 초기화
-      this.currentScreen = SCREEN.CHARACTER_SELECT;
+      this.state = GAME_STATE.CHARACTER_SELECT;
+      this.characterSelectIndex = 0;
+      this.characterSelectMessage = "";
+      this.characterSelectMessageTimer = 0;
     } else if (this.mainMenuIndex === 2) {
       this.currentScreen = SCREEN.DIFFICULTY_SELECT;
     }
@@ -209,6 +215,13 @@ class Game {
   }
 
   update(deltaTime) {
+    if (this.state === GAME_STATE.CHARACTER_SELECT) {
+      if (this.characterSelectMessageTimer > 0) {
+        this.characterSelectMessageTimer--;
+      }
+      return;
+    }
+
     if (this.currentScreen !== SCREEN.PLAYING) return;
 
     const diff = difficultyConfig[this.selectedDifficulty];
@@ -288,12 +301,14 @@ class Game {
       this.background.draw(this.ctx);
     }
 
+    if (this.state === GAME_STATE.CHARACTER_SELECT) {
+      this.drawCharacterSelect();
+      return;
+    }
+
     switch (this.currentScreen) {
       case SCREEN.MAIN_MENU:
         this.drawMainMenu();
-        break;
-      case SCREEN.CHARACTER_SELECT:
-        this.drawCharacterSelect();
         break;
       case SCREEN.DIFFICULTY_SELECT:
         this.drawDifficultySelect();
@@ -372,83 +387,217 @@ class Game {
   }
 
   drawCharacterSelect() {
-    this.drawOverlayBackground();
-    this.ctx.fillStyle = "white";
-    this.ctx.font = "bold 64px Arial";
-    this.ctx.textAlign = "center";
-    this.ctx.fillText("캐릭터 선택", this.canvas.width / 2, 120);
+    const ctx = this.ctx;
+    const canvas = this.canvas;
 
-    const cardWidth = 300;
-    const cardHeight = 400;
-    const spacing = 100;
-    const startX = this.canvas.width / 2 - cardWidth - spacing / 2;
-    const cardY = 200;
+    const centerX = canvas.width / 2;
+    const titleY = 90;
 
-    characters.forEach((char, index) => {
-      const isCursorOn = this.cursorCharacterIndex === index;
-      const x = startX + index * (cardWidth + spacing);
-      
-      // 카드 배경
-      this.ctx.save();
-      this.ctx.fillStyle = char.selectable ? "rgba(60, 20, 100, 0.8)" : "rgba(30, 10, 50, 0.6)";
-      
-      if (isCursorOn) {
-        this.ctx.shadowBlur = 20;
-        this.ctx.shadowColor = char.selectable ? "#FFD700" : "#888888";
-        this.ctx.strokeStyle = char.selectable ? "#FFD700" : "#888888";
-        this.ctx.lineWidth = 4;
-      } else {
-        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-        this.ctx.lineWidth = 2;
-      }
-      
-      // 카드 둥근 사각형 (단순화)
-      this.ctx.fillRect(x, cardY, cardWidth, cardHeight);
-      this.ctx.strokeRect(x, cardY, cardWidth, cardHeight);
-      
-      // 캐릭터 이미지
-      if (char.id === "jieeng") {
-        if (this.player && this.player.sprites.run) {
-          this.ctx.drawImage(this.player.sprites.run, 0, 0, 124, 124, x + cardWidth/2 - 62, cardY + 80, 124, 124);
-        }
-      } else {
-        // 실루엣
-        this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-        this.ctx.beginPath();
-        this.ctx.arc(x + cardWidth/2, cardY + 140, 50, 0, Math.PI * 2);
-        this.ctx.fill();
-        this.ctx.fillRect(x + cardWidth/2 - 40, cardY + 190, 80, 60);
-        
-        this.ctx.fillStyle = "white";
-        this.ctx.font = "bold 24px Arial";
-        this.ctx.textAlign = "center";
-        this.ctx.fillText("LOCKED", x + cardWidth/2, cardY + 230);
-      }
-      
-      // 캐릭터 이름
-      this.ctx.fillStyle = isCursorOn ? "#FFD700" : "white";
-      this.ctx.font = "bold 32px Arial";
-      this.ctx.textAlign = "center";
-      this.ctx.fillText(char.name, x + cardWidth / 2, cardY + 340);
-      
-      // 상태 표시
-      if (!char.selectable) {
-        this.ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
-        this.ctx.font = "20px Arial";
-        this.ctx.fillText("COMING SOON", x + cardWidth / 2, cardY + 375);
-      } else if (this.selectedCharacterIndex === index) {
-        this.ctx.fillStyle = "#FFD700";
-        this.ctx.font = "20px Arial";
-        this.ctx.fillText("SELECTED", x + cardWidth / 2, cardY + 375);
-      }
-      
-      this.ctx.restore();
+    const cardWidth = 260;
+    const cardHeight = 360;
+    const cardY = 170;
+    const gap = 80;
+
+    const leftCardX = centerX - cardWidth - gap / 2;
+    const rightCardX = centerX + gap / 2;
+
+    ctx.save();
+
+    ctx.fillStyle = "rgba(20, 10, 38, 0.48)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.font = "bold 54px Arial";
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(220, 190, 255, 0.85)";
+    ctx.shadowBlur = 14;
+    ctx.fillText("캐릭터 선택", centerX, titleY);
+
+    ctx.shadowBlur = 0;
+
+    ctx.textAlign = "right";
+    ctx.font = "bold 20px Arial";
+    ctx.fillStyle = "#eee6ff";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    ctx.shadowBlur = 6;
+    ctx.fillText("ESC : 뒤로가기", canvas.width - 32, 36);
+
+    ctx.shadowBlur = 0;
+    ctx.textAlign = "center";
+
+    this.drawCharacterCard({
+      x: leftCardX,
+      y: cardY,
+      width: cardWidth,
+      height: cardHeight,
+      index: 0,
+      name: "지에엥",
+      selectable: true,
+      isSelected: this.characterSelectIndex === 0
     });
 
-    this.ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    this.ctx.font = "24px Arial";
-    this.ctx.textAlign = "center";
-    this.ctx.fillText("← → 선택 / ENTER 확정 / BACKSPACE 또는 ESC 뒤로가기", this.canvas.width / 2, 650);
+    this.drawCharacterCard({
+      x: rightCardX,
+      y: cardY,
+      width: cardWidth,
+      height: cardHeight,
+      index: 1,
+      name: "Coming Soon",
+      selectable: false,
+      isSelected: this.characterSelectIndex === 1
+    });
+
+    ctx.font = "bold 18px Arial";
+    ctx.fillStyle = "#eee6ff";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+    ctx.shadowBlur = 5;
+    ctx.fillText("← → 선택 / ENTER 선택 / ESC 또는 BACKSPACE 뒤로가기", centerX, cardY + cardHeight + 48);
+
+    if (this.characterSelectMessage && this.characterSelectMessageTimer > 0) {
+      ctx.font = "bold 24px Arial";
+      ctx.fillStyle = "#ffd86b";
+      ctx.shadowColor = "rgba(255, 216, 107, 0.85)";
+      ctx.shadowBlur = 10;
+      ctx.fillText(this.characterSelectMessage, centerX, cardY + cardHeight + 86);
+    }
+
+    ctx.restore();
+  }
+
+  drawCharacterCard({ x, y, width, height, index, name, selectable, isSelected }) {
+    const ctx = this.ctx;
+
+    ctx.save();
+
+    ctx.fillStyle = selectable
+      ? "rgba(92, 55, 98, 0.68)"
+      : "rgba(42, 34, 58, 0.72)";
+
+    ctx.strokeStyle = isSelected
+      ? "#ffd600"
+      : selectable
+        ? "rgba(238, 230, 255, 0.55)"
+        : "rgba(160, 145, 180, 0.35)";
+
+    ctx.lineWidth = isSelected ? 5 : 2;
+
+    if (isSelected) {
+      ctx.shadowColor = "rgba(255, 214, 0, 0.9)";
+      ctx.shadowBlur = 18;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    if (index === 0) {
+      const playerImage = this.assets.getImage("playerRun");
+
+      if (playerImage) {
+        const previewWidth = 170;
+        const previewHeight = 170;
+        const previewX = x + width / 2 - previewWidth / 2;
+        const previewY = y + 72;
+
+        ctx.drawImage(
+          playerImage,
+          previewX,
+          previewY,
+          previewWidth,
+          previewHeight
+        );
+      } else {
+        ctx.fillStyle = "rgba(230, 190, 255, 0.75)";
+        ctx.beginPath();
+        ctx.ellipse(x + width / 2, y + 150, 54, 76, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.font = "bold 30px Arial";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(name, x + width / 2, y + height - 72);
+
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "#ffd86b";
+      ctx.fillText("SELECTABLE", x + width / 2, y + height - 38);
+    }
+
+    if (index === 1) {
+      const silhouetteX = x + width / 2;
+      const silhouetteY = y + 150;
+
+      ctx.fillStyle = "rgba(20, 14, 34, 0.75)";
+      ctx.beginPath();
+      ctx.ellipse(silhouetteX, silhouetteY - 40, 34, 42, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.roundRect(silhouetteX - 48, silhouetteY - 4, 96, 120, 42);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.font = "bold 96px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("?", silhouetteX, silhouetteY + 16);
+
+      ctx.font = "bold 28px Arial";
+      ctx.fillStyle = "rgba(238, 230, 255, 0.72)";
+      ctx.fillText("Coming Soon", x + width / 2, y + height - 76);
+
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "rgba(255, 216, 107, 0.6)";
+      ctx.fillText("LOCKED", x + width / 2, y + height - 40);
+    }
+
+    ctx.restore();
+  }
+
+  handleCharacterSelectKeyDown(event) {
+    if (event.code === "Escape" || event.code === "Backspace") {
+      event.preventDefault();
+      this.state = GAME_STATE.WAITING;
+      return true;
+    }
+
+    if (event.code === "ArrowLeft") {
+      event.preventDefault();
+      this.characterSelectIndex = 0;
+      return true;
+    }
+
+    if (event.code === "ArrowRight") {
+      event.preventDefault();
+      this.characterSelectIndex = 1;
+      return true;
+    }
+
+    if (event.code === "Enter" || event.code === "Space") {
+      event.preventDefault();
+
+      if (this.characterSelectIndex === 0) {
+        this.selectedCharacterIndex = 0;
+        this.state = GAME_STATE.WAITING;
+        return true;
+      }
+
+      if (this.characterSelectIndex === 1) {
+        this.characterSelectMessage = "Coming Soon";
+        this.characterSelectMessageTimer = 90;
+        return true;
+      }
+    }
+
+    return false;
   }
 
   drawDifficultySelect() {
