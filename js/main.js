@@ -471,6 +471,7 @@ class Game {
   drawCharacterCard({ x, y, width, height, index, name, selectable, isSelected }) {
     const ctx = this.ctx;
 
+    // 1. 카드 배경 및 테두리 (Glow 효과 포함)
     ctx.save();
 
     ctx.fillStyle = selectable
@@ -497,8 +498,9 @@ class Game {
     ctx.fill();
     ctx.stroke();
 
-    ctx.shadowBlur = 0;
+    ctx.restore(); // Shadow 상태 해제
 
+    // 2. 캐릭터 이미지 (상태 초기화 후 렌더링)
     if (index === 0) {
       const character = this.characters[index];
       const cardImage = character && character.cardAssetKey
@@ -506,6 +508,15 @@ class Game {
         : null;
 
       if (cardImage && cardImage.complete !== false) {
+        ctx.save();
+        
+        // 캐릭터 이미지에 영향을 주지 않도록 상태 완전 초기화
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+        ctx.globalAlpha = 1;
+        ctx.filter = "none";
+        ctx.globalCompositeOperation = "source-over";
+
         const maxPreviewWidth = 190;
         const maxPreviewHeight = 210;
 
@@ -528,13 +539,19 @@ class Game {
           previewWidth,
           previewHeight
         );
+        
+        ctx.restore();
       } else {
+        ctx.save();
         ctx.fillStyle = "rgba(230, 190, 255, 0.75)";
         ctx.beginPath();
         ctx.ellipse(x + width / 2, y + 150, 54, 76, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
 
+      // 3. 카드 텍스트
+      ctx.save();
       ctx.font = "bold 30px Arial";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
@@ -544,9 +561,11 @@ class Game {
       ctx.font = "bold 18px Arial";
       ctx.fillStyle = "#ffd86b";
       ctx.fillText("SELECTABLE", x + width / 2, y + height - 38);
+      ctx.restore();
     }
 
     if (index === 1) {
+      ctx.save();
       const silhouetteX = x + width / 2;
       const silhouetteY = y + 150;
 
@@ -572,9 +591,8 @@ class Game {
       ctx.font = "bold 18px Arial";
       ctx.fillStyle = "rgba(255, 216, 107, 0.6)";
       ctx.fillText("LOCKED", x + width / 2, y + height - 40);
+      ctx.restore();
     }
-
-    ctx.restore();
   }
 
   handleCharacterSelectKeyDown(event) {
