@@ -213,6 +213,16 @@ class GiantPotion extends GameObject {
       image,
     });
     this.type = "giant_potion";
+    this.padding = 8;
+  }
+
+  getHitBox() {
+    return {
+      x: this.x + this.padding,
+      y: this.y + this.padding,
+      width: this.width - this.padding * 2,
+      height: this.height - this.padding * 2,
+    };
   }
 
   draw(ctx) {

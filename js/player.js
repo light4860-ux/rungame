@@ -133,6 +133,11 @@ class Player {
     this.giantScale = 1.45; // 시각적 배율
     this.giantHitBoxScale = 1.15; // 히트박스 배율
 
+    // 거대화 종료 후 보호 상태 추가
+    this.isPostGiantInvincible = false;
+    this.postGiantInvincibleTimer = 0;
+    this.postGiantInvincibleDuration = 2000;
+
     this.color = GAME_CONFIG.player.color;
 
     const animConfig = GAME_CONFIG.player.animation;
@@ -188,9 +193,11 @@ class Player {
 
     this.currentAnimKey = "run";
 
-    // 거대화 초기화
+    // 거대화 및 보호 상태 초기화
     this.isGiantMode = false;
     this.giantModeTimer = 0;
+    this.isPostGiantInvincible = false;
+    this.postGiantInvincibleTimer = 0;
   }
 
   update(input, worldSpeed, deltaTime) {
@@ -200,6 +207,7 @@ class Player {
     this.updateInvincibility(deltaTime);
     this.updateBounceEffect(deltaTime);
     this.updateGiantMode(deltaTime);
+    this.updatePostGiantInvincibility(deltaTime);
   }
 
   // 거대화 상태 업데이트
@@ -210,6 +218,21 @@ class Player {
     if (this.giantModeTimer <= 0) {
       this.isGiantMode = false;
       this.giantModeTimer = 0;
+      
+      // 거대화 종료 직후 보호 상태 진입
+      this.isPostGiantInvincible = true;
+      this.postGiantInvincibleTimer = this.postGiantInvincibleDuration;
+    }
+  }
+
+  // 거대화 종료 후 보호 상태 업데이트
+  updatePostGiantInvincibility(deltaTime) {
+    if (!this.isPostGiantInvincible) return;
+
+    this.postGiantInvincibleTimer -= deltaTime;
+    if (this.postGiantInvincibleTimer <= 0) {
+      this.isPostGiantInvincible = false;
+      this.postGiantInvincibleTimer = 0;
     }
   }
 
@@ -421,9 +444,11 @@ class Player {
     ctx.save();
 
     // 무적 상태일 때 깜빡임 효과 적용
-    if (this.isInvincible && !this.isGiantMode) {
-      const blink = Math.floor(this.invincibleTimer / 100) % 2 === 0;
-      ctx.globalAlpha = blink ? 0.45 : 1;
+    if ((this.isInvincible && !this.isGiantMode) || this.isPostGiantInvincible) {
+      // 100ms 단위로 깜빡임 (0.35 ~ 1.0 alpha)
+      const timer = this.isPostGiantInvincible ? this.postGiantInvincibleTimer : this.invincibleTimer;
+      const blink = Math.floor(timer / 100) % 2 === 0;
+      ctx.globalAlpha = blink ? 0.35 : 1;
     }
 
     // 거대화 아우라 효과

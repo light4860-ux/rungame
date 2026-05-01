@@ -60,8 +60,8 @@ class Game {
     
     this.obstacles = [];
     this.items = [];
-
-    this.lastTime = 0;
+    this.particles = [];
+    this.score = 0;
     this.spawnTimer = 0;
     this.nextSpawnInterval = this.getRandomSpawnInterval();
     this.lastPatternName = "";
@@ -238,7 +238,12 @@ class Game {
     this.score += this.worldSpeed * GAME_CONFIG.score.distanceScoreRate;
 
     if (this.background) this.background.update(this.worldSpeed);
-    if (this.player) this.player.update(this.input, this.worldSpeed, deltaTime);
+    this.player.update(this.input.keys, this.worldSpeed, deltaTime);
+    this.updateObstacles(deltaTime);
+    this.updateItems(deltaTime);
+    this.updateParticles(deltaTime);
+    this.updateScore(deltaTime);
+    this.patternManager.update(this.worldSpeed, deltaTime);
 
     // 패턴 단위 생성 관리
     this.spawnTimer++;
@@ -255,11 +260,16 @@ class Game {
         if (this.player.isGiantMode) {
           // 거대화 중 장애물 파괴
           obstacle.markedForDelete = true;
+          // 파괴 이펙트 생성
+          this.createObstacleBreakEffect(obstacle);
+          
           // 보너스 점수
           let bonus = 50;
           if (obstacle.type === "double") bonus = 80;
           if (obstacle.type === "slide") bonus = 60;
           this.score += bonus;
+        } else if (this.player.isPostGiantInvincible) {
+          // 거대화 종료 후 깜빡임 보호 상태 - 데미지 없음, 파괴 없음
         } else {
           // 난이도별 데미지 적용
           const damaged = this.player.takeDamage(diff.damage);
@@ -302,12 +312,21 @@ class Game {
     if (pattern.items) this.items.push(...pattern.items);
 
     // 거대화 물약 스폰 (낮은 확률)
-    if (Math.random() < 0.15) { // 약 15% 확률로 패턴 생성 시 물약 스폰 시도
+    if (Math.random() < 0.15) { 
       const potionImage = this.assets.getImage("giantPotion");
       if (potionImage) {
-        // 장애물과 겹치지 않는 위치 찾기 (패턴 끝 부분에 배치)
-        const potionX = startX + 600 + Math.random() * 400;
-        const potionY = GAME_CONFIG.ground.y - 90;
+        // 물약 y 위치 랜덤화 (low, mid, high)
+        const rand = Math.random();
+        let potionY;
+        if (rand < 0.45) {
+          potionY = GAME_CONFIG.ground.y - 85; // low (45%)
+        } else if (rand < 0.85) {
+          potionY = GAME_CONFIG.ground.y - 130; // mid (40%)
+        } else {
+          potionY = GAME_CONFIG.ground.y - 175; // high (15%)
+        }
+
+        const potionX = startX + 400 + Math.random() * 600;
         this.items.push(new GiantPotion({ x: potionX, y: potionY, image: potionImage }));
       }
     }
@@ -350,6 +369,7 @@ class Game {
         this.drawGame();
         break;
       case SCREEN.GAME_OVER:
+        this.drawGame();
         this.drawGameOver();
         break;
     }
@@ -357,6 +377,7 @@ class Game {
 
   drawGame() {
     this.obstacles.forEach((o) => o.draw(this.ctx));
+    this.drawParticles();
     this.items.forEach((i) => i.draw(this.ctx));
     if (this.player) this.player.draw(this.ctx);
     this.drawUI();
@@ -382,7 +403,67 @@ class Game {
       this.ctx.textAlign = "right";
       const remaining = (this.player.giantModeTimer / 1000).toFixed(1);
       this.ctx.fillText(`GIANT: ${remaining}s`, this.canvas.width - 40, 100);
+    } else if (this.player && this.player.isPostGiantInvincible) {
+      this.ctx.fillStyle = "#A8FFD6";
+      this.ctx.font = "bold 24px Arial";
+      this.ctx.textAlign = "right";
+      const remaining = (this.player.postGiantInvincibleTimer / 1000).toFixed(1);
+      this.ctx.fillText(`SAFE: ${remaining}s`, this.canvas.width - 40, 100);
     }
+  }
+
+  // 장애물 파괴 파티클 생성
+  createObstacleBreakEffect(obstacle) {
+    const box = obstacle.getHitBox();
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    
+    let count = 10;
+    if (obstacle.type === "double") count = 18;
+    if (obstacle.type === "slide") count = 14;
+
+    const colors = ["#b77cff", "#d6a8ff", "#7f5aa8", "#8e7a9d", "#c7b2d8"];
+
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        x: centerX,
+        y: centerY,
+        vx: (Math.random() - 0.5) * 10,
+        vy: (Math.random() - 0.7) * 12,
+        size: Math.random() * 6 + 4,
+        life: 500 + Math.random() * 300,
+        maxLife: 800,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1
+      });
+    }
+  }
+
+  updateParticles(deltaTime) {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.4; // 중력
+      p.life -= deltaTime;
+      p.alpha = Math.max(0, p.life / p.maxLife);
+      
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+  }
+
+  drawParticles() {
+    this.ctx.save();
+    this.particles.forEach(p => {
+      this.ctx.globalAlpha = p.alpha;
+      this.ctx.fillStyle = p.color;
+      this.ctx.beginPath();
+      this.ctx.roundRect(p.x, p.y, p.size, p.size, 2);
+      this.ctx.fill();
+    });
+    this.ctx.restore();
   }
 
   drawHpBar() {
