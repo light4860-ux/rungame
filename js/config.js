@@ -23,7 +23,8 @@ const difficultyConfig = {
   easy: {
     label: "EASY",
     initialSpeed: 3.0,
-    speedIncrease: 0.00055,
+    speedIncrease: 0.00010,
+    maxSpeed: 4.0,
     obstacleMinGap: 500,
     obstacleMaxGap: 700,
     damage: 12
@@ -31,7 +32,8 @@ const difficultyConfig = {
   normal: {
     label: "NORMAL",
     initialSpeed: 3.5,
-    speedIncrease: 0.0008,
+    speedIncrease: 0.0001,
+    maxSpeed: 5.0,
     obstacleMinGap: 420,
     obstacleMaxGap: 600,
     damage: 20
@@ -39,7 +41,8 @@ const difficultyConfig = {
   hard: {
     label: "HARD",
     initialSpeed: 4.2,
-    speedIncrease: 0.00115,
+    speedIncrease: 0.00035,
+    maxSpeed: 6.0,
     obstacleMinGap: 340,
     obstacleMaxGap: 500,
     damage: 28
@@ -66,8 +69,8 @@ const characters = [
     // run/jump: 128x307 → 비율 2.40, drawWidth=82 → height=197
     // doubleJump: 160x307 → 비율 1.92, drawWidth=82 → height=157
     // slide: 200x300 → 비율 1.50, drawWidth=110 → height=165
-    normalDrawWidth: 72,
-    normalDrawHeight: 65,
+    normalDrawWidth: 85,
+    normalDrawHeight: 60,
     slideDrawWidth: 145,    // 실제 캐릭터 가로 173px에 맞게
     slideDrawHeight: 46,    // 실제 캐릭터 세로 88px에 맞게 (슬라이드니까 낮게)
     // 오프셋 설정
@@ -281,7 +284,7 @@ const GAME_CONFIG = {
     size: 72,
     score: 100,
     color: "#ffd600",
-    collectPadding: 5,
+    collectPadding: 20,
     giantPotion: {
       width: 42,
       height: 64,
@@ -301,10 +304,10 @@ const GAME_CONFIG = {
     lateGameMaxSpawnInterval: 135,
 
     coinGap: 48,
-    obstacleGap: 280,
-    slideSafeGap: 420,
-    comboObstacleGap: 580,   // 충분히 늘려서 슬라이드+점프 겹침 방지
-    earlySlideExtraCooldown: 40,
+    obstacleGap: 340,
+    slideSafeGap: 560,
+    comboObstacleGap: 720,   // 충분히 늘려서 슬라이드+점프 겹침 방지
+    earlySlideExtraCooldown: 70,
 
     coinArc: {
       count: 5,
