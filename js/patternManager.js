@@ -10,38 +10,38 @@ class PatternManager {
   }
 
   // 패턴 생성 메인 메서드
-  createPattern(patternName, startX) {
+  createPattern(patternName, startX, existingObstacles = [], canvasWidth = 1280) {
     let result;
     switch (patternName) {
       case "coinLine":
-        result = this.createCoinLine(startX);
+        result = this.createCoinLine(startX, existingObstacles, canvasWidth);
         break;
       case "singleObstacleWithCoin":
-        result = this.createSingleObstacleWithCoin(startX);
+        result = this.createSingleObstacleWithCoin(startX, existingObstacles, canvasWidth);
         break;
       case "doubleObstacle":
-        result = this.createDoubleObstacle(startX);
+        result = this.createDoubleObstacle(startX, existingObstacles, canvasWidth);
         break;
       case "coinArc":
-        result = this.createCoinArc(startX);
+        result = this.createCoinArc(startX, existingObstacles, canvasWidth);
         break;
       case "jumpObstacle":
-        result = this.createJumpObstacle(startX);
+        result = this.createJumpObstacle(startX, existingObstacles, canvasWidth);
         break;
       case "slideObstacle":
-        result = this.createSlideObstacle(startX);
+        result = this.createSlideObstacle(startX, existingObstacles, canvasWidth);
         break;
       case "slideThenJump":
-        result = this.createSlideThenJump(startX);
+        result = this.createSlideThenJump(startX, existingObstacles, canvasWidth);
         break;
       case "jumpThenSlide":
-        result = this.createJumpThenSlide(startX);
+        result = this.createJumpThenSlide(startX, existingObstacles, canvasWidth);
         break;
       case "mixedAdvanced":
-        result = this.createMixedAdvanced(startX);
+        result = this.createMixedAdvanced(startX, existingObstacles, canvasWidth);
         break;
       default:
-        result = this.createSingleObstacleWithCoin(startX);
+        result = this.createSingleObstacleWithCoin(startX, existingObstacles, canvasWidth);
     }
 
     // 이미지 로드 실패 등으로 null이 포함된 경우 필터링
@@ -143,9 +143,75 @@ class PatternManager {
     });
   }
 
+  // --- 간격 보정 헬퍼 메서드 ---
+  getObstacleSafeGap(prevObstacle, nextObstacle) {
+    const prevType = prevObstacle.type;
+    const nextType = nextObstacle.type;
+
+    if (prevType === "slide" && nextType === "slide") {
+      return 620;
+    }
+
+    if (prevType === "slide" || nextType === "slide") {
+      return 560;
+    }
+
+    if (prevType === "double" && nextType === "double") {
+      return 460;
+    }
+
+    if (prevType === "double" || nextType === "double") {
+      return 420;
+    }
+
+    return 340;
+  }
+
+  getObstacleRightEdge(obstacle) {
+    const width =
+      obstacle.width ||
+      obstacle.drawWidth ||
+      (GAME_CONFIG.obstacle.types[obstacle.type]
+        ? GAME_CONFIG.obstacle.types[obstacle.type].width
+        : 0);
+
+    return obstacle.x + width;
+  }
+
+  resolveObstacleOverlap(newObstacle, obstacles, canvasWidth) {
+    if (!newObstacle) return newObstacle;
+
+    // 5. 화면 밖 spawn 보정
+    if (canvasWidth && newObstacle.x < canvasWidth + 40) {
+      newObstacle.x = canvasWidth + 40;
+    }
+
+    if (!obstacles || obstacles.length === 0) {
+      return newObstacle;
+    }
+
+    let adjustedX = newObstacle.x;
+
+    for (const obstacle of obstacles) {
+      if (!obstacle) continue;
+      if (obstacle.destroyed) continue;
+
+      const obstacleRight = this.getObstacleRightEdge(obstacle);
+      const safeGap = this.getObstacleSafeGap(obstacle, newObstacle);
+      const minX = obstacleRight + safeGap;
+
+      if (adjustedX < minX) {
+        adjustedX = minX;
+      }
+    }
+
+    newObstacle.x = adjustedX;
+    return newObstacle;
+  }
+
   /* --- 패턴 정의 메서드들 --- */
 
-  createCoinLine(startX) {
+  createCoinLine(startX, existingObstacles, canvasWidth) {
     const items = [];
     const obstacles = [];
     const gap = GAME_CONFIG.patterns.coinGap;
@@ -158,28 +224,48 @@ class PatternManager {
     return { obstacles, items };
   }
 
-  createSingleObstacleWithCoin(startX) {
+  createSingleObstacleWithCoin(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createObstacle(startX, "normal"));
+    let o1 = this.createObstacle(startX, "normal");
+    if (o1) addObstacle(o1);
+
     items.push(this.createItem(startX + 95, GAME_CONFIG.ground.y - 170));
     items.push(this.createItem(startX + 145, GAME_CONFIG.ground.y - 210));
 
     return { obstacles, items };
   }
 
-  createDoubleObstacle(startX) {
+  createDoubleObstacle(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createObstacle(startX, "double"));
+    let o1 = this.createObstacle(startX, "double");
+    if (o1) addObstacle(o1);
+
     items.push(this.createItem(startX + 120, GAME_CONFIG.ground.y - 245));
 
     return { obstacles, items };
   }
 
-  createCoinArc(startX) {
+  createCoinArc(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
     const config = GAME_CONFIG.patterns.coinArc;
@@ -195,11 +281,21 @@ class PatternManager {
     return { obstacles, items };
   }
 
-  createJumpObstacle(startX) {
+  createJumpObstacle(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createObstacle(startX + 80, "normal"));
+    let o1 = this.createObstacle(startX + 80, "normal");
+    if (o1) addObstacle(o1);
+
     items.push(this.createItem(startX, GAME_CONFIG.ground.y - 145));
     items.push(this.createItem(startX + 80, GAME_CONFIG.ground.y - 225));
     items.push(this.createItem(startX + 160, GAME_CONFIG.ground.y - 145));
@@ -207,54 +303,115 @@ class PatternManager {
     return { obstacles, items };
   }
 
-  createSlideObstacle(startX) {
+  createSlideObstacle(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createAerialObstacle(startX));
+    let o1 = this.createAerialObstacle(startX);
+    if (o1) addObstacle(o1);
+
     items.push(this.createItem(startX + 170, GAME_CONFIG.ground.y - 115));
     items.push(this.createItem(startX + 220, GAME_CONFIG.ground.y - 115));
 
     return { obstacles, items };
   }
 
-  createSlideThenJump(startX) {
+  createSlideThenJump(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
     const gap = GAME_CONFIG.patterns.comboObstacleGap;
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createAerialObstacle(startX));
-    obstacles.push(this.createObstacle(startX + gap, "normal"));
+    let o1 = this.createAerialObstacle(startX);
+    if (o1) o1 = addObstacle(o1);
+
+    let nextX = startX + gap;
+    if (o1) {
+      nextX = this.getObstacleRightEdge(o1) + gap;
+    }
+
+    let o2 = this.createObstacle(nextX, "normal");
+    if (o2) o2 = addObstacle(o2);
+
     items.push(this.createItem(startX + 150, GAME_CONFIG.ground.y - 115));
-    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 220));
+    items.push(this.createItem(nextX - 80, GAME_CONFIG.ground.y - 220));
 
     return { obstacles, items };
   }
 
-  createJumpThenSlide(startX) {
+  createJumpThenSlide(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
     const gap = GAME_CONFIG.patterns.comboObstacleGap;
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
-    obstacles.push(this.createObstacle(startX, "normal"));
-    obstacles.push(this.createAerialObstacle(startX + gap));
+    let o1 = this.createObstacle(startX, "normal");
+    if (o1) o1 = addObstacle(o1);
+
+    let nextX = startX + gap;
+    if (o1) {
+      nextX = this.getObstacleRightEdge(o1) + gap;
+    }
+
+    let o2 = this.createAerialObstacle(nextX);
+    if (o2) o2 = addObstacle(o2);
+
     items.push(this.createItem(startX + 90, GAME_CONFIG.ground.y - 220));
-    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 115));
+    items.push(this.createItem(nextX - 80, GAME_CONFIG.ground.y - 115));
 
     return { obstacles, items };
   }
 
-  createMixedAdvanced(startX) {
+  createMixedAdvanced(startX, existingObstacles, canvasWidth) {
     const obstacles = [];
     const items = [];
     const gap = GAME_CONFIG.patterns.comboObstacleGap;
+    
+    const addObstacle = (obs) => {
+      if (!obs) return null;
+      const checkList = existingObstacles.concat(obstacles);
+      obs = this.resolveObstacleOverlap(obs, checkList, canvasWidth);
+      obstacles.push(obs);
+      return obs;
+    };
 
     // 장애물 2개로 줄이고 간격 충분히 확보
-    obstacles.push(this.createObstacle(startX, "normal"));
-    obstacles.push(this.createAerialObstacle(startX + gap));
+    let o1 = this.createObstacle(startX, "normal");
+    if (o1) o1 = addObstacle(o1);
+
+    let nextX = startX + gap;
+    if (o1) {
+      nextX = this.getObstacleRightEdge(o1) + gap;
+    }
+
+    let o2 = this.createAerialObstacle(nextX);
+    if (o2) o2 = addObstacle(o2);
+
     items.push(this.createItem(startX + 90, GAME_CONFIG.ground.y - 220));
-    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 115));
-    items.push(this.createItem(startX + gap + 120, GAME_CONFIG.ground.y - 180));
+    items.push(this.createItem(nextX - 80, GAME_CONFIG.ground.y - 115));
+    items.push(this.createItem(nextX + 120, GAME_CONFIG.ground.y - 180));
 
     return { obstacles, items };
   }

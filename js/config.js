@@ -23,7 +23,7 @@ const difficultyConfig = {
   easy: {
     label: "EASY",
     initialSpeed: 3.0,
-    speedIncrease: 0.00010,
+    speedIncrease: 0.000015,
     maxSpeed: 4.0,
     obstacleMinGap: 500,
     obstacleMaxGap: 700,
@@ -32,7 +32,7 @@ const difficultyConfig = {
   normal: {
     label: "NORMAL",
     initialSpeed: 3.5,
-    speedIncrease: 0.0001,
+    speedIncrease: 0.000025,
     maxSpeed: 5.0,
     obstacleMinGap: 420,
     obstacleMaxGap: 600,
@@ -41,7 +41,7 @@ const difficultyConfig = {
   hard: {
     label: "HARD",
     initialSpeed: 4.2,
-    speedIncrease: 0.00035,
+    speedIncrease: 0.000035,
     maxSpeed: 6.0,
     obstacleMinGap: 340,
     obstacleMaxGap: 500,
@@ -289,6 +289,13 @@ const GAME_CONFIG = {
       width: 42,
       height: 64,
       score: 300,
+      spawnChance: 0.055,
+      firstSpawnDelay: 15000,
+      cooldown: {
+        easy: { min: 35000, max: 45000 },
+        normal: { min: 45000, max: 60000 },
+        hard: { min: 55000, max: 75000 }
+      }
     }
   },
 

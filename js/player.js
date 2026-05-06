@@ -228,9 +228,9 @@ class Player {
     this.postGiantInvincibleTimer = 0;
   }
 
-  update(input, worldSpeed, deltaTime) {
+  update(input, worldSpeed, deltaTime, selectedDifficulty = "normal") {
     this.handleSlide(input);
-    this.applyGravity(worldSpeed);
+    this.applyGravity(worldSpeed, selectedDifficulty);
     this.updateAnimationState(deltaTime);
     this.updateInvincibility(deltaTime);
     this.updateBounceEffect(deltaTime);
@@ -343,12 +343,30 @@ class Player {
     }
   }
 
-  jump(worldSpeed) {
-    if (this.jumpCount < GAME_CONFIG.player.maxJumpCount) {
-      const speedRatio = this.getSpeedRatio(worldSpeed);
-      const jumpBonus = GAME_CONFIG.player.maxJumpPowerBonus * speedRatio;
+  getMotionScale(worldSpeed, selectedDifficulty = "normal") {
+    const currentSpeed = worldSpeed || GAME_CONFIG.world.baseSpeed;
+    const difficulty = difficultyConfig[selectedDifficulty] || difficultyConfig.normal;
+    
+    const initialSpeed = difficulty.initialSpeed;
+    const maxSpeed = difficulty.maxSpeed || GAME_CONFIG.world.maxSpeed;
 
-      this.velocityY = GAME_CONFIG.player.jumpPower - jumpBonus;
+    const speedRatio = Math.max(
+      0,
+      Math.min(1, (currentSpeed - initialSpeed) / (maxSpeed - initialSpeed))
+    );
+
+    const minMotionScale = 0.78;
+    const maxMotionScale = 1.15;
+
+    return minMotionScale + (maxMotionScale - minMotionScale) * speedRatio;
+  }
+
+  jump(worldSpeed, selectedDifficulty = "normal") {
+    if (this.jumpCount < GAME_CONFIG.player.maxJumpCount) {
+      const motionScale = this.getMotionScale(worldSpeed, selectedDifficulty);
+      const effectiveJumpPower = GAME_CONFIG.player.jumpPower * motionScale;
+
+      this.velocityY = effectiveJumpPower;
       this.jumpCount += 1;
 
       if (this.jumpCount === 1) this.currentAnimKey = "jump";
@@ -383,12 +401,11 @@ class Player {
     this.y = bottomY - this.height;
   }
 
-  applyGravity(worldSpeed) {
-    const speedRatio = this.getSpeedRatio(worldSpeed);
-    const gravityScale = 1 + (GAME_CONFIG.player.maxGravityScale - 1) * speedRatio;
-    const adjustedGravity = GAME_CONFIG.player.gravity * gravityScale;
+  applyGravity(worldSpeed, selectedDifficulty = "normal") {
+    const motionScale = this.getMotionScale(worldSpeed, selectedDifficulty);
+    const effectiveGravity = GAME_CONFIG.player.gravity * (motionScale * motionScale);
 
-    this.velocityY += adjustedGravity;
+    this.velocityY += effectiveGravity;
     this.y += this.velocityY;
 
     const groundY = GAME_CONFIG.ground.y - this.height;

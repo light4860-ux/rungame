@@ -135,9 +135,8 @@ class Game {
       // 5. 게임 중 조작
       if (this.currentScreen === SCREEN.PLAYING) {
         if (event.code === "Space" || event.code === "ArrowUp") {
-          if (this.player) this.player.jump(this.worldSpeed);
-        }
-        if (event.code === "ArrowDown") {
+          if (this.player) this.player.jump(this.worldSpeed, this.selectedDifficulty);
+        } else if (event.code === "ArrowDown") {
           this.input.down = true;
         }
       }
@@ -211,6 +210,14 @@ class Game {
     this.spawnTimer = 0;
     this.nextSpawnInterval = this.getRandomSpawnInterval();
     this.lastPatternName = "";
+    
+    // 자이언트 물약 스폰 관리 초기화
+    this.gameStartTime = performance.now();
+    this.lastGiantPotionSpawnTime = 0;
+    this.nextGiantPotionCooldown = GAME_CONFIG.item.giantPotion.firstSpawnDelay;
+    
+    // deltaTime 폭주 방지를 위해 시간 기준점 초기화
+    this.lastTime = performance.now();
   }
 
   update(deltaTime) {
@@ -225,9 +232,11 @@ class Game {
 
     const diff = difficultyConfig[this.selectedDifficulty];
 
-    // 속도 점진적 증가 (난이도별 가중치 적용)
-    if (this.worldSpeed < GAME_CONFIG.world.maxSpeed) {
+    // 속도 점진적 증가 (해당 난이도의 maxSpeed까지만 제한)
+    if (this.worldSpeed < diff.maxSpeed) {
       this.worldSpeed += diff.speedIncrease * deltaTime;
+      // 혹시라도 deltaTime 때문에 넘어가면 maxSpeed로 고정
+      if (this.worldSpeed > diff.maxSpeed) this.worldSpeed = diff.maxSpeed;
     }
 
     // 거리 및 점수 계산
@@ -235,7 +244,7 @@ class Game {
     this.score += this.worldSpeed * GAME_CONFIG.score.distanceScoreRate;
 
     if (this.background) this.background.update(this.worldSpeed);
-    this.player.update(this.input, this.worldSpeed, deltaTime);
+    this.player.update(this.input, this.worldSpeed, deltaTime, this.selectedDifficulty);
     this.updateParticles(deltaTime);
 
     // 패턴 단위 생성 관리
@@ -300,27 +309,46 @@ class Game {
     if (!this.patternManager) return;
     const startX = GAME_CONFIG.canvas.width + 100;
     const patternName = this.patternManager.selectRandomPattern(this.score);
-    const pattern = this.patternManager.createPattern(patternName, startX);
+    const pattern = this.patternManager.createPattern(patternName, startX, this.obstacles, this.canvas.width);
     if (pattern.obstacles) this.obstacles.push(...pattern.obstacles);
     if (pattern.items) this.items.push(...pattern.items);
 
-    // 거대화 물약 스폰 (점수 1500 이후, 매우 낮은 확률 - 4%)
-    if (this.score >= 1500 && Math.random() < 0.04) { 
-      const potionImage = this.assets.getImage("giantPotion");
-      if (potionImage) {
-        // 물약 y 위치 랜덤화 (low, mid, high)
-        const rand = Math.random();
-        let potionY;
-        if (rand < 0.45) {
-          potionY = GAME_CONFIG.ground.y - 85; // low (45%)
-        } else if (rand < 0.85) {
-          potionY = GAME_CONFIG.ground.y - 130; // mid (40%)
-        } else {
-          potionY = GAME_CONFIG.ground.y - 175; // high (15%)
-        }
+    // 거대화 물약 스폰 로직 (쿨타임 및 확률 적용)
+    const currentTime = performance.now();
+    const elapsed = currentTime - this.gameStartTime;
+    const potionConfig = GAME_CONFIG.item.giantPotion;
 
-        const potionX = startX + 400 + Math.random() * 600;
-        this.items.push(new GiantPotion({ x: potionX, y: potionY, image: potionImage }));
+    // 1. 최소 대기 시간 확인
+    if (elapsed >= potionConfig.firstSpawnDelay) {
+      // 2. 쿨타임 확인
+      if (currentTime - this.lastGiantPotionSpawnTime >= this.nextGiantPotionCooldown) {
+        // 3. 거대화/보호 상태 확인
+        if (!this.player.isGiantMode && !this.player.isPostGiantInvincible) {
+          // 4. 화면 내 중복 생성 방지
+          const hasGiantPotionOnScreen = this.items.some(item => item instanceof GiantPotion || item.type === "giant_potion");
+          if (!hasGiantPotionOnScreen) {
+            // 5. 확률 검사
+            if (Math.random() <= potionConfig.spawnChance) {
+              const potionImage = this.assets.getImage("giantPotion");
+              if (potionImage) {
+                const rand = Math.random();
+                let potionY;
+                if (rand < 0.45) potionY = GAME_CONFIG.ground.y - 85;
+                else if (rand < 0.85) potionY = GAME_CONFIG.ground.y - 130;
+                else potionY = GAME_CONFIG.ground.y - 175;
+
+                const potionX = startX + 400 + Math.random() * 600;
+                this.items.push(new GiantPotion({ x: potionX, y: potionY, image: potionImage }));
+
+                // 쿨타임 재설정
+                this.lastGiantPotionSpawnTime = currentTime;
+                const difficulty = this.selectedDifficulty || "normal";
+                const cooldownRange = potionConfig.cooldown[difficulty] || potionConfig.cooldown.normal;
+                this.nextGiantPotionCooldown = cooldownRange.min + Math.random() * (cooldownRange.max - cooldownRange.min);
+              }
+            }
+          }
+        }
       }
     }
 
@@ -789,7 +817,10 @@ class Game {
   }
 
   animate(timeStamp) {
-    const deltaTime = timeStamp - this.lastTime;
+    let deltaTime = timeStamp - this.lastTime;
+    // 탭 이동이나 랙으로 인해 deltaTime이 비정상적으로 커지는 것을 방지 (최대 50ms 제한)
+    if (deltaTime > 50) deltaTime = 50;
+    
     this.lastTime = timeStamp;
     this.update(deltaTime);
     this.draw();
