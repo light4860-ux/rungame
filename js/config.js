@@ -22,27 +22,27 @@ const SCREEN = {
 const difficultyConfig = {
   easy: {
     label: "EASY",
-    initialSpeed: 2.8,
-    speedIncrease: 0.00045,
-    obstacleMinGap: 460,
-    obstacleMaxGap: 680,
-    damage: 6
+    initialSpeed: 3.0,
+    speedIncrease: 0.00055,
+    obstacleMinGap: 500,
+    obstacleMaxGap: 700,
+    damage: 12
   },
   normal: {
     label: "NORMAL",
-    initialSpeed: 3.4,
-    speedIncrease: 0.0007,
-    obstacleMinGap: 390,
-    obstacleMaxGap: 590,
-    damage: 10
+    initialSpeed: 3.5,
+    speedIncrease: 0.0008,
+    obstacleMinGap: 420,
+    obstacleMaxGap: 600,
+    damage: 20
   },
   hard: {
     label: "HARD",
-    initialSpeed: 4.1,
-    speedIncrease: 0.001,
-    obstacleMinGap: 330,
+    initialSpeed: 4.2,
+    speedIncrease: 0.00115,
+    obstacleMinGap: 340,
     obstacleMaxGap: 500,
-    damage: 14
+    damage: 28
   }
 };
 
@@ -52,15 +52,68 @@ const characters = [
     id: "jieeng",
     name: "지에엥",
     selectable: true,
-    status: "available",
-    assetKey: "player"
+    runAssetKey: "playerRun",
+    jumpAssetKey: "playerJump",
+    doubleJumpAssetKey: "playerDoubleJump",
+    slideAssetKey: "playerSlide",
+    cardAssetKey: "characterJieengCard",
+    // 프레임 수 설정
+    runFrameCount: 6,
+    jumpFrameCount: 4,
+    doubleJumpFrameCount: 5,
+    slideFrameCount: 3,
+    // 렌더링 설정 (스프라이트 실제 비율 반영)
+    // run/jump: 128x307 → 비율 2.40, drawWidth=82 → height=197
+    // doubleJump: 160x307 → 비율 1.92, drawWidth=82 → height=157
+    // slide: 200x300 → 비율 1.50, drawWidth=110 → height=165
+    normalDrawWidth: 72,
+    normalDrawHeight: 65,
+    slideDrawWidth: 145,    // 실제 캐릭터 가로 173px에 맞게
+    slideDrawHeight: 46,    // 실제 캐릭터 세로 88px에 맞게 (슬라이드니까 낮게)
+    // 오프셋 설정
+    runOffsetX: 5,
+    jumpOffsetX: 5,
+    doubleJumpOffsetX: 5,
+    slideOffsetX: -50,
+    // 모션별 소스 인셋 (실제 여백 기반)
+    sourceInsets: {
+      run:        { left: -6,  right: 12, top: 90,  bottom: 105 },
+      jump:       { left: 6,  right: 2, top: 90,  bottom: 105 },
+      doubleJump: { left: 6,  right: 2, top: 96,  bottom: 85  },
+      slide:      { left: 10, right: 10, top: 108, bottom: 98  },  // 상단111, 하단101 여백 제거
+    }
   },
   {
-    id: "coming_soon",
-    name: "Coming Soon",
-    selectable: false,
-    status: "coming_soon",
-    assetKey: null
+    id: "snowmage",
+    name: "스노우메이지",
+    selectable: true,
+    runAssetKey: "character2Run",
+    jumpAssetKey: "character2Jump",
+    doubleJumpAssetKey: "character2DoubleJump",
+    slideAssetKey: "character2Slide",
+    cardAssetKey: "characterSnowmageCard",
+    // 프레임 수 설정
+    runFrameCount: 6,
+    jumpFrameCount: 4,
+    doubleJumpFrameCount: 5,
+    slideFrameCount: 6,
+    // 렌더링 설정 (스프라이트 실제 비율 반영)
+    normalDrawWidth: 88,
+    normalDrawHeight: 97,
+    slideDrawWidth: 110,
+    slideDrawHeight: 55,
+    // 오프셋 설정
+    runOffsetX: 0,
+    jumpOffsetX: 0,
+    doubleJumpOffsetX: 0,
+    slideOffsetX: 4,
+    // 모션별 소스 인셋 (스노우메이지 전용)
+    sourceInsets: {
+      run:        { left: 1,  right: 4,  top: 5,   bottom: 5  },
+      jump:       { left: 4,  right: 4,  top: 5,   bottom: 5  },
+      doubleJump: { left: 10, right: 10, top: 265, bottom: 5  },
+      slide:      { left: 47,  right: -40,  top: 5,   bottom: 5  },
+    }
   }
 ];
 
@@ -88,7 +141,7 @@ const GAME_CONFIG = {
     // 체력 및 무적 시스템
     maxHp: 100,
     damagePerHit: 25,
-    invincibleDuration: 1200,
+    invincibleDuration: 700,
 
     // 물리 기반 기본 높이/너비 (주로 지면 착지 기준점으로 사용)
     width: 42,
@@ -131,7 +184,7 @@ const GAME_CONFIG = {
       doubleJumpFps: 14,
       slideFps: 10,
 
-      runFrameWidth: 124,
+      runFrameWidth: null,
       runFrameHeight: null,
 
       jumpFrameWidth: null,
@@ -143,12 +196,12 @@ const GAME_CONFIG = {
       slideFrameWidth: null,
       slideFrameHeight: null,
 
-      // 모션별 정밀 소스 인셋 설정
+      // 모션별 정밀 소스 인셋 설정 (캐릭터별 설정이 없을 때 fallback)
       sourceInsets: {
-        run: { left: 2, right: 2, y: 0 },
-        jump: { left: 2, right: 2, y: 0 },
-        doubleJump: { left: 2, right: 4, y: 0 },
-        slide: { left: 0, right: 0, y: 0 },
+        run:        { left: 1, right: 2, top: 0, bottom: 0 },
+        jump:       { left: 2, right: 2, top: 0, bottom: 0 },
+        doubleJump: { left: 2, right: 4, top: 0, bottom: 0 },
+        slide:      { left: 0, right: 0, top: 0, bottom: 0 },
       },
 
       // 모션별 렌더링 설정 (displayWidth, offsetX, offsetY)
@@ -225,13 +278,13 @@ const GAME_CONFIG = {
 
   item: {
     spawnChance: 0.65,
-    size: 40,
+    size: 72,
     score: 100,
     color: "#ffd600",
-    collectPadding: 2,
+    collectPadding: 5,
     giantPotion: {
-      width: 48,
-      height: 56,
+      width: 42,
+      height: 64,
       score: 300,
     }
   },
@@ -248,9 +301,9 @@ const GAME_CONFIG = {
     lateGameMaxSpawnInterval: 135,
 
     coinGap: 48,
-    obstacleGap: 240, 
-    slideSafeGap: 360,
-    comboObstacleGap: 380, 
+    obstacleGap: 280,
+    slideSafeGap: 420,
+    comboObstacleGap: 580,   // 충분히 늘려서 슬라이드+점프 겹침 방지
     earlySlideExtraCooldown: 40,
 
     coinArc: {
@@ -285,6 +338,13 @@ const GAME_CONFIG = {
       bgStage1: "./assets/images/bg_stage1_test.png",
       ground: "./assets/images/ground_stage1_pastel_gothic.png",
       giantPotion: "./assets/images/item_giant_potion.png",
+
+      // 스노우메이지 에셋
+      character2Run: "./assets/images/character2_run.png",
+      character2Jump: "./assets/images/character2_jump.png",
+      character2DoubleJump: "./assets/images/character2_doublejump.png",
+      character2Slide: "./assets/images/character2_slide.png",
+      characterSnowmageCard: "./assets/images/character_snowmage_card.png",
     },
 
     // 게임 중단을 방지하기 위해 크로마키 기능을 우선 비활성화합니다.

@@ -33,22 +33,9 @@ class Game {
     this.characterSelectMessage = "";
     this.characterSelectMessageTimer = 0;
 
-    this.characters = [
-      {
-        id: "jieeng",
-        name: "지에엥",
-        selectable: true,
-        assetKey: "playerRun",
-        cardAssetKey: "characterJieengCard"
-      },
-      {
-        id: "empty",
-        name: "Coming Soon",
-        selectable: false,
-        assetKey: null,
-        cardAssetKey: null
-      }
-    ];
+    // config.js의 전체 캐릭터 설정을 그대로 사용합니다.
+    // 축약 배열을 만들면 drawWidth/offset 누락으로 캐릭터가 사라질 수 있습니다.
+    this.characters = characters.map((character) => ({ ...character }));
 
     this.score = 0;
     this.distance = 0;
@@ -60,6 +47,8 @@ class Game {
     
     this.obstacles = [];
     this.items = [];
+    this.particles = [];
+    this.input.down = false;
     this.particles = [];
     this.score = 0;
     this.spawnTimer = 0;
@@ -75,7 +64,7 @@ class Game {
     try {
       await this.assets.loadAll(GAME_CONFIG.assets.images);
 
-      this.player = new Player(this.assets);
+      this.player = new Player(this.assets, this.characters[this.selectedCharacterIndex]);
       this.background = new Background(this.assets);
       this.patternManager = new PatternManager(this.assets);
 
@@ -182,7 +171,8 @@ class Game {
       this.currentScreen = SCREEN.PLAYING;
     } else if (this.mainMenuIndex === 1) {
       this.state = GAME_STATE.CHARACTER_SELECT;
-      this.characterSelectIndex = 0;
+      this.currentScreen = SCREEN.CHARACTER_SELECT;
+      this.characterSelectIndex = this.selectedCharacterIndex || 0;
       this.characterSelectMessage = "";
       this.characterSelectMessageTimer = 0;
     } else if (this.mainMenuIndex === 2) {
@@ -191,12 +181,12 @@ class Game {
   }
 
   getRandomSpawnInterval() {
-    const diff = difficultyConfig[this.selectedDifficulty];
-    const config = GAME_CONFIG.patterns;
-    
-    // 난이도에 따른 생성 간격 보정
-    const min = diff.obstacleMinGap / 3; // 단순화된 틱 단위 변환
-    const max = diff.obstacleMaxGap / 3;
+    const diff = difficultyConfig[this.selectedDifficulty] || difficultyConfig.normal;
+
+    // difficultyConfig의 간격은 거리 기준이고, spawnTimer는 프레임 단위입니다.
+    // /5.2로 변환하여 장애물/패턴 등장 빈도가 너무 낮아진 문제를 복구합니다.
+    const min = Math.max(55, Math.floor(diff.obstacleMinGap / 5.2));
+    const max = Math.max(min + 10, Math.floor(diff.obstacleMaxGap / 5.2));
 
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
@@ -209,9 +199,15 @@ class Game {
     this.worldSpeed = diff.initialSpeed; // 초기 속도 적용
     this.state = GAME_STATE.PLAYING;
 
-    if (this.player) this.player.reset();
+    if (this.player) {
+      this.player.characterData = this.characters[this.selectedCharacterIndex];
+      this.player.initAnimations(this.player.characterData);
+      this.player.reset();
+    }
     this.obstacles = [];
     this.items = [];
+    this.particles = [];
+    this.input.down = false;
     this.spawnTimer = 0;
     this.nextSpawnInterval = this.getRandomSpawnInterval();
     this.lastPatternName = "";
@@ -308,8 +304,8 @@ class Game {
     if (pattern.obstacles) this.obstacles.push(...pattern.obstacles);
     if (pattern.items) this.items.push(...pattern.items);
 
-    // 거대화 물약 스폰 (낮은 확률)
-    if (Math.random() < 0.15) { 
+    // 거대화 물약 스폰 (점수 1500 이후, 매우 낮은 확률 - 4%)
+    if (this.score >= 1500 && Math.random() < 0.04) { 
       const potionImage = this.assets.getImage("giantPotion");
       if (potionImage) {
         // 물약 y 위치 랜덤화 (low, mid, high)
@@ -350,7 +346,7 @@ class Game {
       this.background.draw(this.ctx);
     }
 
-    if (this.state === GAME_STATE.CHARACTER_SELECT) {
+    if (this.state === GAME_STATE.CHARACTER_SELECT || this.currentScreen === SCREEN.CHARACTER_SELECT) {
       this.drawCharacterSelect();
       return;
     }
@@ -564,8 +560,8 @@ class Game {
       width: cardWidth,
       height: cardHeight,
       index: 1,
-      name: "Coming Soon",
-      selectable: false,
+      name: this.characters[1]?.name || "스노우메이지",
+      selectable: this.characters[1]?.selectable !== false,
       isSelected: this.characterSelectIndex === 1
     });
 
@@ -588,26 +584,26 @@ class Game {
 
   drawCharacterCard({ x, y, width, height, index, name, selectable, isSelected }) {
     const ctx = this.ctx;
+    const character = this.characters[index];
+    const isSelectable = character?.selectable !== false && selectable !== false;
+    const displayName = character?.name || name || "";
 
-    // 1. 카드 배경 색상 정의 (선택 여부와 관계없이 동일하게 유지하여 이미지 오염 방지)
-    const cardFillColor = selectable
+    const cardFillColor = isSelectable
       ? "rgba(70, 42, 86, 0.58)"
       : "rgba(28, 22, 42, 0.68)";
 
-    // 2. 카드 기본 배경 및 테두리 그리기
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(x, y, width, height, 18);
     ctx.fillStyle = cardFillColor;
     ctx.fill();
-    ctx.strokeStyle = selectable
+    ctx.strokeStyle = isSelectable
       ? "rgba(238, 230, 255, 0.55)"
       : "rgba(160, 145, 180, 0.35)";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
 
-    // 3. 선택된 카드 강조 (외곽 Glow 효과만 별도로 추가)
     if (isSelected) {
       ctx.save();
       ctx.beginPath();
@@ -620,114 +616,106 @@ class Game {
       ctx.restore();
     }
 
-    // 4. 캐릭터 이미지 및 텍스트 렌더링
-    if (index === 0) {
-      // 캐릭터 이미지 뒤에 중립 보라색 preview panel 배치
-      ctx.save();
-      ctx.fillStyle = "rgba(48, 32, 70, 0.55)";
-      ctx.beginPath();
-      ctx.roundRect(x + 34, y + 34, width - 68, 190, 16);
-      ctx.fill();
-      ctx.restore();
+    ctx.save();
+    ctx.fillStyle = "rgba(48, 32, 70, 0.55)";
+    ctx.beginPath();
+    ctx.roundRect(x + 34, y + 34, width - 68, 190, 16);
+    ctx.fill();
+    ctx.restore();
 
-      const character = this.characters[index];
-      const cardImage = character && character.cardAssetKey
-        ? this.assets.getImage(character.cardAssetKey)
-        : null;
+    const cardImage = character?.cardAssetKey
+      ? this.assets.getImage(character.cardAssetKey)
+      : null;
 
-      if (cardImage && cardImage.complete !== false) {
-        ctx.save();
-        
-        // 캐릭터 이미지에 영향을 주지 않도록 모든 그래픽 상태 완전 초기화
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = "transparent";
-        ctx.globalAlpha = 1;
-        ctx.filter = "none";
-        ctx.globalCompositeOperation = "source-over";
-
-        const maxPreviewWidth = 190;
-        const maxPreviewHeight = 210;
-
-        const imageRatio = cardImage.width / cardImage.height;
-        let previewWidth = maxPreviewWidth;
-        let previewHeight = previewWidth / imageRatio;
-
-        if (previewHeight > maxPreviewHeight) {
-          previewHeight = maxPreviewHeight;
-          previewWidth = previewHeight * imageRatio;
-        }
-
-        const previewX = x + width / 2 - previewWidth / 2;
-        const previewY = y + 52;
-
-        ctx.drawImage(
-          cardImage,
-          previewX,
-          previewY,
-          previewWidth,
-          previewHeight
-        );
-        
-        ctx.restore();
-      } else {
-        ctx.save();
-        ctx.fillStyle = "rgba(230, 190, 255, 0.75)";
-        ctx.beginPath();
-        ctx.ellipse(x + width / 2, y + 150, 54, 76, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // 5. 카드 텍스트 그리기 (상태 격리)
+    if (cardImage && cardImage.complete !== false) {
       ctx.save();
       ctx.shadowBlur = 0;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "bold 30px Arial";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(name, x + width / 2, y + height - 72);
+      ctx.shadowColor = "transparent";
+      ctx.globalAlpha = 1;
+      ctx.filter = "none";
+      ctx.globalCompositeOperation = "source-over";
 
-      ctx.font = "bold 18px Arial";
-      ctx.fillStyle = "#ffd86b";
-      ctx.fillText("SELECTABLE", x + width / 2, y + height - 38);
+      let srcX = 0;
+      let srcY = 0;
+      let srcW = cardImage.width;
+      let srcH = cardImage.height;
+
+      // 카드 전용 이미지가 아닌 스프라이트 시트를 카드에 쓰는 경우에는 첫 프레임만 사용합니다.
+      const isCardOnlyImage = character.cardAssetKey?.includes("Card");
+      if (!isCardOnlyImage) {
+        const frameCount = character.runFrameCount || 1;
+        srcW = cardImage.width / frameCount;
+      }
+
+      const maxPreviewWidth = 190;
+      const maxPreviewHeight = 210;
+      
+      // 캐릭터별 렌더링 비율을 고려하여 aspect ratio 결정
+      const renderRatio = character.normalDrawWidth / character.normalDrawHeight;
+      const imageRatio = srcW / srcH;
+
+      let previewWidth = maxPreviewWidth;
+      let previewHeight = previewWidth / imageRatio;
+
+      if (previewHeight > maxPreviewHeight) {
+        previewHeight = maxPreviewHeight;
+        previewWidth = previewHeight * imageRatio;
+      }
+
+      const previewX = x + width / 2 - previewWidth / 2;
+      const previewY = y + 44 + (maxPreviewHeight - previewHeight) / 2;
+
+      ctx.drawImage(
+        cardImage,
+        srcX,
+        srcY,
+        srcW,
+        srcH,
+        previewX,
+        previewY,
+        previewWidth,
+        previewHeight
+      );
+
       ctx.restore();
-    }
-
-    if (index === 1) {
+    } else if (!isSelectable) {
       ctx.save();
       const silhouetteX = x + width / 2;
       const silhouetteY = y + 150;
-
       ctx.fillStyle = "rgba(20, 14, 34, 0.75)";
       ctx.beginPath();
       ctx.ellipse(silhouetteX, silhouetteY - 40, 34, 42, 0, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.beginPath();
       ctx.roundRect(silhouetteX - 48, silhouetteY - 4, 96, 120, 42);
       ctx.fill();
-
       ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
       ctx.font = "bold 96px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("?", silhouetteX, silhouetteY + 16);
-
-      ctx.font = "bold 28px Arial";
-      ctx.fillStyle = "rgba(238, 230, 255, 0.72)";
-      ctx.fillText("Coming Soon", x + width / 2, y + height - 76);
-
-      ctx.font = "bold 18px Arial";
-      ctx.fillStyle = "rgba(255, 216, 107, 0.6)";
-      ctx.fillText("LOCKED", x + width / 2, y + height - 40);
       ctx.restore();
     }
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 30px Arial";
+    ctx.fillStyle = isSelectable ? "#ffffff" : "rgba(238, 230, 255, 0.72)";
+    ctx.fillText(displayName, x + width / 2, y + height - 72);
+
+    ctx.font = "bold 18px Arial";
+    ctx.fillStyle = isSelectable ? "#ffd86b" : "rgba(255, 216, 107, 0.6)";
+    ctx.fillText(isSelectable ? "SELECTABLE" : "LOCKED", x + width / 2, y + height - 38);
+    ctx.restore();
   }
 
   handleCharacterSelectKeyDown(event) {
     if (event.code === "Escape" || event.code === "Backspace") {
       event.preventDefault();
       this.state = GAME_STATE.WAITING;
+      this.currentScreen = SCREEN.MAIN_MENU;
       return true;
     }
 
@@ -746,15 +734,11 @@ class Game {
     if (event.code === "Enter" || event.code === "Space") {
       event.preventDefault();
 
-      if (this.characterSelectIndex === 0) {
-        this.selectedCharacterIndex = 0;
+      const selectedChar = this.characters[this.characterSelectIndex];
+      if (selectedChar && selectedChar.selectable) {
+        this.selectedCharacterIndex = this.characterSelectIndex;
         this.state = GAME_STATE.WAITING;
-        return true;
-      }
-
-      if (this.characterSelectIndex === 1) {
-        this.characterSelectMessage = "Coming Soon";
-        this.characterSelectMessageTimer = 90;
+        this.currentScreen = SCREEN.MAIN_MENU;
         return true;
       }
     }

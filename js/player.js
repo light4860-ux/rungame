@@ -59,33 +59,39 @@ class SpriteAnimation {
     return Math.round(drawWidth * srcH / srcW);
   }
 
-  draw(ctx, x, y, drawWidth, options = {}) {
+  draw(ctx, x, y, drawWidth, drawHeight, options = {}) {
     if (!this.image) return false;
 
     const insetLeft = options.sourceInsetLeft || 0;
     const insetRight = options.sourceInsetRight || 0;
-    const insetY = options.sourceInsetY || 0;
+    const insetTop = options.sourceInsetTop || 0;
+    const insetBottom = options.sourceInsetBottom || 0;
 
-    // 버그 수정: 프레임 너비(frameWidth)를 기준으로 정확한 소스 영역 계산
-    const srcX = this.currentFrame * this.frameWidth + insetLeft;
-    const srcY = insetY;
-    const srcW = Math.max(1, this.frameWidth - insetLeft - insetRight);
-    const srcH = Math.max(1, this.frameHeight - insetY * 2);
+    const frameCount = Math.max(1, this.frameCount);
+    const frameWidth = this.image.width / frameCount;
+    const frameHeight = this.image.height;
 
-    const renderH = Math.round(drawWidth * srcH / srcW);
+    const currentFrame = this.currentFrame % frameCount;
+    const srcX = currentFrame * frameWidth + insetLeft;
+    const srcY = insetTop;
+    const srcW = Math.max(1, frameWidth - insetLeft - insetRight);
+    const srcH = Math.max(1, frameHeight - insetTop - insetBottom);
+
+    // clip으로 옆 프레임 삐져나옴 방지
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, drawWidth, drawHeight);
+    ctx.clip();
 
     ctx.drawImage(
       this.image,
-      srcX,
-      srcY,
-      srcW,
-      srcH,
-      x,
-      y,
-      drawWidth,
-      renderH
+      srcX, srcY,
+      srcW, srcH,
+      x, y,
+      drawWidth, drawHeight
     );
 
+    ctx.restore();
     return true;
   }
 
@@ -100,8 +106,9 @@ class SpriteAnimation {
   Player 클래스는 캐릭터의 상태와 애니메이션을 관리합니다.
 */
 class Player {
-  constructor(assets) {
+  constructor(assets, characterData) {
     this.assets = assets;
+    this.characterData = characterData || characters[0];
 
     this.normalWidth = GAME_CONFIG.player.width;
     this.normalHeight = GAME_CONFIG.player.height;
@@ -138,40 +145,61 @@ class Player {
     this.postGiantInvincibleTimer = 0;
     this.postGiantInvincibleDuration = 2000;
 
-    this.color = GAME_CONFIG.player.color;
+    // 플레이어 렌더링 크기 고정
+    this.drawWidth = 90;
+    this.drawHeight = 105;
 
-    const animConfig = GAME_CONFIG.player.animation;
-    this.animations = {
-      run: new SpriteAnimation(this.assets.getImage("playerRun"), {
-        frameCount: 6,
-        fps: animConfig.runFps,
-        manualFrameWidth: animConfig.runFrameWidth,
-        manualFrameHeight: animConfig.runFrameHeight,
-      }),
-      jump: new SpriteAnimation(this.assets.getImage("playerJump"), {
-        frameCount: 4,
-        fps: animConfig.jumpFps,
-        loop: true,
-        manualFrameWidth: animConfig.jumpFrameWidth,
-        manualFrameHeight: animConfig.jumpFrameHeight,
-      }),
-      doubleJump: new SpriteAnimation(this.assets.getImage("playerDoubleJump"), {
-        frameCount: 5,
-        fps: animConfig.doubleJumpFps,
-        loop: false,
-        manualFrameWidth: animConfig.doubleJumpFrameWidth,
-        manualFrameHeight: animConfig.doubleJumpFrameHeight,
-      }),
-      slide: new SpriteAnimation(this.assets.getImage("playerSlide"), {
-        frameCount: 3,
-        fps: animConfig.slideFps,
-        manualFrameWidth: animConfig.slideFrameWidth,
-        manualFrameHeight: animConfig.slideFrameHeight,
-      }),
-    };
+    this.color = GAME_CONFIG.player.color;
+    
+    // 선택된 캐릭터 기반 애니메이션 초기화
+    this.initAnimations(this.characterData);
 
     this.currentAnimKey = "run";
     this.reset();
+  }
+
+  // 선택된 캐릭터에 따라 애니메이션 세트를 다시 빌드합니다.
+  initAnimations(character) {
+    if (!character) return;
+    
+    const animConfig = GAME_CONFIG.player.animation;
+    const assets = this.assets;
+
+    // 이미지 헬퍼: 요청한 키가 없거나 로드되지 않았으면 기본 run으로 fallback
+    const getSafeImage = (key, fallbackKey) => {
+      let img = assets.getImage(key);
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        if (fallbackKey) {
+          img = assets.getImage(fallbackKey);
+        }
+        // 최종 fallback: 지에엥 기본 run
+        if (!img || !img.complete || img.naturalWidth === 0) {
+          img = assets.getImage("playerRun");
+        }
+      }
+      return img;
+    };
+
+    this.animations = {
+      run: new SpriteAnimation(getSafeImage(character.runAssetKey), {
+        frameCount: character.runFrameCount || 6,
+        fps: animConfig.runFps,
+      }),
+      jump: new SpriteAnimation(getSafeImage(character.jumpAssetKey, character.runAssetKey), {
+        frameCount: character.jumpFrameCount || 4,
+        fps: animConfig.jumpFps,
+        loop: true,
+      }),
+      doubleJump: new SpriteAnimation(getSafeImage(character.doubleJumpAssetKey, character.jumpAssetKey), {
+        frameCount: character.doubleJumpFrameCount || 5,
+        fps: animConfig.doubleJumpFps,
+        loop: false,
+      }),
+      slide: new SpriteAnimation(getSafeImage(character.slideAssetKey, character.runAssetKey), {
+        frameCount: character.slideFrameCount || 3,
+        fps: animConfig.slideFps,
+      }),
+    };
   }
 
   reset() {
@@ -419,24 +447,65 @@ class Player {
   // 현재 모션별 정밀 인셋 값을 가져옵니다.
   getCurrentSourceInset() {
     const animConfig = GAME_CONFIG.player.animation;
-    const motionInset = animConfig.sourceInsets?.[this.currentAnimKey];
+    const char = this.characterData || characters[0];
+
+    // 캐릭터별 인셋 우선, 없으면 global 인셋 사용
+    const charInsets = char.sourceInsets?.[this.currentAnimKey];
+    const globalInsets = animConfig.sourceInsets?.[this.currentAnimKey];
+    const motionInset = charInsets || globalInsets;
 
     return {
-      sourceInsetLeft: motionInset?.left ?? GAME_CONFIG.player.spriteSourceInsetLeft ?? 0,
-      sourceInsetRight: motionInset?.right ?? GAME_CONFIG.player.spriteSourceInsetRight ?? 0,
-      sourceInsetY: motionInset?.y ?? GAME_CONFIG.player.spriteSourceInsetY ?? 0,
+      sourceInsetLeft:   motionInset?.left   ?? 0,
+      sourceInsetRight:  motionInset?.right  ?? 0,
+      sourceInsetTop:    motionInset?.top    ?? 0,
+      sourceInsetBottom: motionInset?.bottom ?? 0,
     };
   }
 
   // 현재 모션별 렌더링 설정(크기, 오프셋)을 가져옵니다.
   getCurrentRenderSetting() {
-    const animConfig = GAME_CONFIG.player.animation;
-    const setting = animConfig.renderSettings?.[this.currentAnimKey];
+    const char = this.characterData || characters[0];
+    const isSliding = this.isSliding;
+
+    const fallbackNormalWidth = GAME_CONFIG.player.displayWidth || 90;
+    const fallbackNormalHeight = 92;
+    const fallbackSlideWidth = 90;
+    const fallbackSlideHeight = 50;
+
+    let baseWidth, baseHeight;
+
+    if (isSliding) {
+      baseWidth = char.slideDrawWidth ?? fallbackSlideWidth;
+      baseHeight = char.slideDrawHeight ?? fallbackSlideHeight;
+    } else {
+      baseWidth = char.normalDrawWidth ?? fallbackNormalWidth;
+      // 모션별로 스프라이트 비율이 다를 경우 각각 계산
+      const anim = this.animations[this.currentAnimKey];
+      if (anim && anim.image && anim.frameWidth > 0) {
+        // 실제 스프라이트 비율로 height 계산
+        baseHeight = Math.round(baseWidth * anim.frameHeight / anim.frameWidth);
+        // 너무 크거나 작아지면 normalDrawHeight로 cap
+        const maxH = (char.normalDrawHeight ?? fallbackNormalHeight) * 2;
+        const minH = (char.normalDrawHeight ?? fallbackNormalHeight) * 0.5;
+        baseHeight = Math.min(maxH, Math.max(minH, baseHeight));
+      } else {
+        baseHeight = char.normalDrawHeight ?? fallbackNormalHeight;
+      }
+    }
+
+    let offsetX = 0;
+    switch (this.currentAnimKey) {
+      case "run": offsetX = char.runOffsetX ?? 0; break;
+      case "jump": offsetX = char.jumpOffsetX ?? 0; break;
+      case "doubleJump": offsetX = char.doubleJumpOffsetX ?? 0; break;
+      case "slide": offsetX = char.slideOffsetX ?? 0; break;
+      default: offsetX = char.runOffsetX ?? 0;
+    }
 
     return {
-      displayWidth: setting?.displayWidth ?? GAME_CONFIG.player.displayWidth,
-      offsetX: setting?.offsetX ?? GAME_CONFIG.player.spriteOffsetX,
-      offsetY: setting?.offsetY ?? GAME_CONFIG.player.spriteOffsetY,
+      drawWidth: baseWidth,
+      drawHeight: baseHeight,
+      offsetX: offsetX
     };
   }
 
@@ -447,43 +516,61 @@ class Player {
     if ((this.isInvincible && !this.isGiantMode) || this.isPostGiantInvincible) {
       // 100ms 단위로 깜빡임 (0.35 ~ 1.0 alpha)
       const timer = this.isPostGiantInvincible ? this.postGiantInvincibleTimer : this.invincibleTimer;
-      const blink = Math.floor(timer / 100) % 2 === 0;
+      // 무적 시간이 짧아졌으므로 깜빡임 주기도 약간 조정 (80ms)
+      const blink = Math.floor(timer / 80) % 2 === 0;
       ctx.globalAlpha = blink ? 0.35 : 1;
     }
 
-    // 거대화 아우라 효과
+    // 거대화 아우라 효과 (박스 테두리 제거, 그림자 glow만 사용)
     if (this.isGiantMode) {
       ctx.save();
-      const box = this.getHitBox();
-      ctx.shadowBlur = 25;
-      ctx.shadowColor = "rgba(255, 215, 0, 0.6)"; // 황금색 아우라
-      ctx.strokeStyle = "rgba(255, 215, 0, 0.3)";
-      ctx.lineWidth = 4;
+      const renderSetting = this.getCurrentRenderSetting();
+      const scale = this.giantScale;
+      const dw = renderSetting.drawWidth * scale;
+      const dh = renderSetting.drawHeight * scale;
+      const drawX = this.x + renderSetting.offsetX * scale;
+      const drawBottomY = this.y + this.height;
+      const drawY = drawBottomY - dh;
+
+      // 테두리 없이 황금색 glow만 표현
+      ctx.shadowBlur = 40;
+      ctx.shadowColor = "rgba(255, 215, 0, 0.9)";
+      ctx.fillStyle = "rgba(255, 215, 0, 0)"; // 투명 fill
       ctx.beginPath();
-      ctx.roundRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20, 20);
-      ctx.stroke();
+      ctx.ellipse(
+        drawX + dw / 2,
+        drawY + dh / 2,
+        dw / 2 + 10,
+        dh / 2 + 10,
+        0, 0, Math.PI * 2
+      );
+      ctx.fill();
       ctx.restore();
     }
 
-    const anim = this.animations[this.currentAnimKey];
+    let anim = this.animations[this.currentAnimKey];
+    if (!anim || !anim.image) {
+      anim = this.animations.run;
+    }
     let drawn = false;
 
     if (anim && anim.image) {
-      // 모션별 렌더링 설정 적용
       const renderSetting = this.getCurrentRenderSetting();
-      // 거대화 스케일 적용
       const scale = this.isGiantMode ? this.giantScale : 1;
-      const dw = renderSetting.displayWidth * scale;
+      
+      const dw = renderSetting.drawWidth * scale;
+      const dh = renderSetting.drawHeight * scale;
       
       const sourceInset = this.getCurrentSourceInset();
-      const renderH = anim.getRenderHeight(dw, sourceInset);
       
-      const drawX = this.x - (dw - this.width) / 2 + renderSetting.offsetX * scale;
+      const drawX = this.x + renderSetting.offsetX * scale;
       
-      // y값에 바운스 오프셋 적용 및 바닥 정렬 유지
-      const drawY = (this.y + this.height) - renderH + (renderSetting.offsetY * scale) + this.bounceOffset;
+      // 발 기준 정렬 (바닥 Y축 고정)
+      // 물리적인 바닥 위치 = this.y + this.height
+      const drawBottomY = this.y + this.height;
+      const drawY = drawBottomY - dh + this.bounceOffset;
 
-      drawn = anim.draw(ctx, drawX, drawY, dw, sourceInset);
+      drawn = anim.draw(ctx, drawX, drawY, dw, dh, sourceInset);
     }
 
     if (!drawn) {

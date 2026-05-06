@@ -55,16 +55,19 @@ class PatternManager {
     const config = GAME_CONFIG.patterns;
 
     const easyPatterns = [
-      "coinLine",
-      "coinLine",
       "singleObstacleWithCoin",
-      "coinArc",
+      "singleObstacleWithCoin",
+      "jumpObstacle",
       "slideObstacle",
+      "coinLine",
+      "coinArc",
     ];
 
     const mediumPatterns = [
       "doubleObstacle",
+      "doubleObstacle",
       "jumpObstacle",
+      "slideObstacle",
     ];
 
     const hardPatterns = [
@@ -223,7 +226,7 @@ class PatternManager {
     obstacles.push(this.createAerialObstacle(startX));
     obstacles.push(this.createObstacle(startX + gap, "normal"));
     items.push(this.createItem(startX + 150, GAME_CONFIG.ground.y - 115));
-    items.push(this.createItem(startX + gap, GAME_CONFIG.ground.y - 220));
+    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 220));
 
     return { obstacles, items };
   }
@@ -236,7 +239,7 @@ class PatternManager {
     obstacles.push(this.createObstacle(startX, "normal"));
     obstacles.push(this.createAerialObstacle(startX + gap));
     items.push(this.createItem(startX + 90, GAME_CONFIG.ground.y - 220));
-    items.push(this.createItem(startX + gap + 110, GAME_CONFIG.ground.y - 115));
+    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 115));
 
     return { obstacles, items };
   }
@@ -246,12 +249,12 @@ class PatternManager {
     const items = [];
     const gap = GAME_CONFIG.patterns.comboObstacleGap;
 
+    // 장애물 2개로 줄이고 간격 충분히 확보
     obstacles.push(this.createObstacle(startX, "normal"));
     obstacles.push(this.createAerialObstacle(startX + gap));
-    obstacles.push(this.createObstacle(startX + gap * 2, "double"));
-    items.push(this.createItem(startX + 80, GAME_CONFIG.ground.y - 220));
-    items.push(this.createItem(startX + gap + 120, GAME_CONFIG.ground.y - 115));
-    items.push(this.createItem(startX + gap * 2, GAME_CONFIG.ground.y - 250));
+    items.push(this.createItem(startX + 90, GAME_CONFIG.ground.y - 220));
+    items.push(this.createItem(startX + gap - 80, GAME_CONFIG.ground.y - 115));
+    items.push(this.createItem(startX + gap + 120, GAME_CONFIG.ground.y - 180));
 
     return { obstacles, items };
   }

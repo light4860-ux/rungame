@@ -172,13 +172,13 @@ class Item extends GameObject {
   }
 
   getHitBox() {
-    const padding = GAME_CONFIG.item.collectPadding || 0;
+    const padding = GAME_CONFIG.item.collectPadding || 4;
 
     return {
-      x: this.x - padding,
-      y: this.y - padding,
-      width: this.width + padding * 2,
-      height: this.height + padding * 2,
+      x: this.x + padding,
+      y: this.y + padding,
+      width: this.width - padding * 2,
+      height: this.height - padding * 2,
     };
   }
 
