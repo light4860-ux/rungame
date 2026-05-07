@@ -114,7 +114,7 @@ const characters = [
     sourceInsets: {
       run:        { left: 1,  right: 4,  top: 5,   bottom: 5  },
       jump:       { left: 4,  right: 4,  top: 5,   bottom: 5  },
-      doubleJump: { left: 10, right: 30, top: 10, bottom: 5  },
+      doubleJump: { left: 10, right: 35, top: 10, bottom: 5  },
       slide:      { left: 47,  right: -40,  top: 5,   bottom: 5  },
     }
   }
